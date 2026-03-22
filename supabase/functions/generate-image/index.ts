@@ -42,6 +42,7 @@ serve(async (req) => {
             content: prompt,
           },
         ],
+        modalities: ["image", "text"],
       }),
     });
 
@@ -69,14 +70,23 @@ serve(async (req) => {
     const data = await response.json();
     console.log("AI response received, extracting image...");
 
-    // Extract image from the response
     const choice = data.choices?.[0];
     const message = choice?.message;
 
     let imageBase64 = null;
 
-    // Check for inline_data in parts (Gemini image generation format)
-    if (message?.content && Array.isArray(message.content)) {
+    // Check message.images array (Lovable AI Gateway format)
+    if (message?.images && Array.isArray(message.images)) {
+      for (const img of message.images) {
+        if (img.image_url?.url) {
+          imageBase64 = img.image_url.url;
+          break;
+        }
+      }
+    }
+
+    // Fallback: check content array
+    if (!imageBase64 && message?.content && Array.isArray(message.content)) {
       for (const part of message.content) {
         if (part.type === "image_url" && part.image_url?.url) {
           imageBase64 = part.image_url.url;
@@ -89,15 +99,8 @@ serve(async (req) => {
       }
     }
 
-    // Check if content is a string with base64
-    if (!imageBase64 && typeof message?.content === "string") {
-      if (message.content.startsWith("data:image")) {
-        imageBase64 = message.content;
-      }
-    }
-
     if (!imageBase64) {
-      console.error("No image found in response:", JSON.stringify(data).slice(0, 500));
+      console.error("No image found in response:", JSON.stringify(data).slice(0, 1000));
       return new Response(
         JSON.stringify({ error: "A IA não retornou uma imagem. Tente reformular seu pedido." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
