@@ -25,6 +25,8 @@ export interface GenerationInput {
   applySeal?: boolean;
   applyPromoBand?: boolean;
   applyUrgency?: boolean;
+  productImageBase64?: string;
+  backgroundImageBase64?: string;
 }
 
 const STYLE_MAP: Record<string, string> = {
