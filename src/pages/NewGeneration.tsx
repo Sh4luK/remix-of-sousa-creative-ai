@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Sparkles, Download, RefreshCw, Copy, Heart, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Sparkles, Download, RefreshCw, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,13 +75,29 @@ export default function NewGeneration() {
     setInput((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleGenerate = async () => {
+  /** Validate for contradictions before generating */
+  const validate = (): string | null => {
     if (!simpleMode && !input.productName.trim()) {
-      toast.error("Informe o nome do produto");
-      return;
+      return "Informe o nome do produto";
     }
     if (simpleMode && !simplePrompt.trim()) {
-      toast.error("Descreva o que deseja gerar");
+      return "Descreva o que deseja gerar";
+    }
+    // Warn if "sem-texto" is selected but text fields are filled
+    if (input.textRules === "sem-texto") {
+      const hasText = !!(input.price?.trim() || input.previousPrice?.trim() || input.headline?.trim() || input.cta?.trim() || input.discount?.trim());
+      if (hasText && !simpleMode) {
+        // Not a hard block — we'll render only the explicit text. Just inform the user.
+        toast.info("Modo 'sem texto' selecionado, mas há campos de texto preenchidos. Apenas o texto explícito será incluído.", { duration: 5000 });
+      }
+    }
+    return null;
+  };
+
+  const handleGenerate = async () => {
+    const error = validate();
+    if (error) {
+      toast.error(error);
       return;
     }
 
@@ -99,7 +115,6 @@ export default function NewGeneration() {
       });
 
       if (error) {
-        // Check for specific HTTP status codes from the edge function
         const context = (error as any)?.context;
         if (context?.status === 402) {
           const body = await context.json?.() ?? {};
@@ -159,7 +174,7 @@ export default function NewGeneration() {
   const handleRefine = async (refinement: string) => {
     if (!generatedImage) return;
     setLoading(true);
-    const newPrompt = finalPrompt + ` Additional refinement: ${refinement}`;
+    const newPrompt = finalPrompt + `\n\nAdditional refinement: ${refinement}`;
     setFinalPrompt(newPrompt);
 
     try {
@@ -172,14 +187,18 @@ export default function NewGeneration() {
       if (!data?.imageUrl) throw new Error("Nenhuma imagem retornada");
 
       setGeneratedImage(data.imageUrl);
-      addToLibrary({
-        imageUrl: data.imageUrl,
-        prompt: newPrompt,
-        productName: simpleMode ? simplePrompt : input.productName,
-        category: input.category,
-        style: input.style,
-        format: input.format,
-      });
+      try {
+        addToLibrary({
+          imageUrl: data.imageUrl,
+          prompt: newPrompt,
+          productName: simpleMode ? simplePrompt : input.productName,
+          category: input.category,
+          style: input.style,
+          format: input.format,
+        });
+      } catch {
+        // Storage full
+      }
       toast.success("Arte refinada!");
     } catch (err: any) {
       toast.error(err.message || "Erro ao refinar");
@@ -259,6 +278,14 @@ export default function NewGeneration() {
                     <Input value={input.previousPrice} onChange={(e) => update("previousPrice", e.target.value)} placeholder="R$ 24,90" />
                   </div>
                   <div>
+                    <Label>Desconto</Label>
+                    <Input value={input.discount} onChange={(e) => update("discount", e.target.value)} placeholder="20% OFF" />
+                  </div>
+                  <div>
+                    <Label>Quantidade/Volume</Label>
+                    <Input value={input.quantity} onChange={(e) => update("quantity", e.target.value)} placeholder="5kg, 2L, 500ml" />
+                  </div>
+                  <div>
                     <Label>Selo</Label>
                     <Select value={input.seal || "nenhum"} onValueChange={(v) => update("seal", v === "nenhum" ? "" : v)}>
                       <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
@@ -270,9 +297,9 @@ export default function NewGeneration() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label>Quantidade/Volume</Label>
-                    <Input value={input.quantity} onChange={(e) => update("quantity", e.target.value)} placeholder="5kg, 2L, 500ml" />
+                  <div className="col-span-2">
+                    <Label>Texto Promocional</Label>
+                    <Input value={input.promoText} onChange={(e) => update("promoText", e.target.value)} placeholder="Ex: Válido até sábado!" />
                   </div>
                 </div>
               </fieldset>
@@ -371,8 +398,16 @@ export default function NewGeneration() {
                       <Input value={input.headline} onChange={(e) => update("headline", e.target.value)} placeholder="Ex: OFERTA IMPERDÍVEL" />
                     </div>
                     <div>
+                      <Label>Texto secundário</Label>
+                      <Input value={input.secondaryText} onChange={(e) => update("secondaryText", e.target.value)} placeholder="Ex: Só esta semana!" />
+                    </div>
+                    <div>
                       <Label>CTA</Label>
                       <Input value={input.cta} onChange={(e) => update("cta", e.target.value)} placeholder="Ex: Compre já!" />
+                    </div>
+                    <div>
+                      <Label>Cores secundárias</Label>
+                      <Input value={input.secondaryColors} onChange={(e) => update("secondaryColors", e.target.value)} placeholder="Ex: branco, preto" />
                     </div>
                     <div>
                       <Label>Observações extras</Label>
@@ -473,7 +508,7 @@ export default function NewGeneration() {
                 {showPrompt ? "Ocultar prompt" : "Ver prompt utilizado"}
               </button>
               {showPrompt && (
-                <div className="rounded-lg bg-muted p-3 text-xs font-mono leading-relaxed break-words animate-scale-in">
+                <div className="rounded-lg bg-muted p-3 text-xs font-mono leading-relaxed break-words whitespace-pre-wrap animate-scale-in">
                   {finalPrompt}
                 </div>
               )}

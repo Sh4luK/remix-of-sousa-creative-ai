@@ -87,7 +87,7 @@ const CATEGORY_CONTEXT: Record<string, string> = {
   "outros": "grocery product",
 };
 
-const NEGATIVE_PROMPT = "avoid distorted packaging, broken typography, unreadable labels, unrealistic anatomy, duplicated items, messy composition, low contrast, blurred product, fake supermarket environment, overly artistic abstract style, childish design, cluttered layout, poor lighting, incorrect brand rendering, malformed objects, exaggerated surrealism, deformed hands, text errors, watermarks";
+const NEGATIVE_PROMPT = "distorted packaging, broken typography, unreadable labels, unrealistic anatomy, duplicated items, messy composition, low contrast, blurred product, fake supermarket environment, overly artistic abstract style, childish design, cluttered layout, poor lighting, incorrect brand rendering, malformed objects, exaggerated surrealism, deformed hands, text errors, watermarks";
 
 function getFormatDescription(format: string): string {
   const fmt = FORMATS.find(f => f.value === format);
@@ -96,7 +96,23 @@ function getFormatDescription(format: string): string {
   let orientation = "square composition";
   if (ratio > 1.05) orientation = "landscape/horizontal orientation";
   else if (ratio < 0.95) orientation = "portrait/vertical orientation";
-  return `Image aspect ratio: ${fmt.value} (${fmt.width}x${fmt.height} pixels). Compose the image in ${orientation}.`;
+  return `Aspect ratio ${fmt.value} (${fmt.width}x${fmt.height} pixels), ${orientation}`;
+}
+
+/**
+ * Determines whether the user has filled in any text-related fields
+ * (price, headline, CTA, etc.) so we can avoid contradicting ourselves.
+ */
+function hasTextContent(input: GenerationInput): boolean {
+  return !!(
+    input.price?.trim() ||
+    input.previousPrice?.trim() ||
+    input.headline?.trim() ||
+    input.cta?.trim() ||
+    input.promoText?.trim() ||
+    input.secondaryText?.trim() ||
+    input.discount?.trim()
+  );
 }
 
 export function buildPrompt(input: GenerationInput): string {
@@ -104,59 +120,107 @@ export function buildPrompt(input: GenerationInput): string {
   const bg = BACKGROUND_MAP[input.background] || BACKGROUND_MAP["estudio-clean"];
   const intensity = INTENSITY_MAP[input.intensity] || INTENSITY_MAP["media"];
   const categoryCtx = CATEGORY_CONTEXT[input.category] || CATEGORY_CONTEXT["outros"];
+  const userHasText = hasTextContent(input);
 
-  let prompt = `Create a high-conversion commercial promotional image for a Brazilian grocery store campaign.`;
-  prompt += ` Main subject: ${input.productName}${input.brand ? ` by ${input.brand}` : ""}.`;
-  prompt += ` Product category: ${categoryCtx}.`;
-  prompt += ` Advertising style: ${style}.`;
-  prompt += ` Background: ${bg}.`;
-  prompt += ` Promotional intensity: ${intensity}.`;
-  prompt += ` ${getFormatDescription(input.format)}`;
+  // ── Section 1: Objective ──
+  const sections: string[] = [];
 
-  if (input.price) prompt += ` Price displayed prominently: ${input.price}.`;
-  if (input.previousPrice) prompt += ` Previous price (crossed out): ${input.previousPrice}.`;
-  if (input.discount) prompt += ` Discount: ${input.discount}.`;
-  if (input.quantity) prompt += ` Product size/volume: ${input.quantity}.`;
-  if (input.headline) prompt += ` Main headline text: "${input.headline}".`;
-  if (input.cta) prompt += ` Call to action text: "${input.cta}".`;
-  if (input.extraInfo) prompt += ` Additional instructions: ${input.extraInfo}.`;
+  sections.push(
+    `Create a high-conversion commercial promotional image for a Brazilian grocery store campaign.`
+  );
 
-  prompt += ` Composition focused on product prominence, retail realism, high visual appeal, strong commercial intention, clean background hierarchy, realistic studio lighting, premium supermarket advertising look, strong contrast, polished composition, Brazilian market aesthetics.`;
+  // ── Section 2: Product ──
+  let product = `Product: ${input.productName}`;
+  if (input.brand?.trim()) product += ` (brand: ${input.brand.trim()})`;
+  product += `. Category: ${categoryCtx}.`;
+  if (input.quantity?.trim()) product += ` Size/volume: ${input.quantity.trim()}.`;
+  sections.push(product);
 
-  if (input.primaryColors) {
-    prompt += ` Primary color palette: ${input.primaryColors}.`;
+  // ── Section 3: Offer & Pricing ──
+  // Only include if user filled in at least one pricing/offer field.
+  const offerParts: string[] = [];
+  if (input.price?.trim()) offerParts.push(`current price "${input.price.trim()}" displayed prominently`);
+  if (input.previousPrice?.trim()) offerParts.push(`previous price "${input.previousPrice.trim()}" shown crossed out`);
+  if (input.discount?.trim()) offerParts.push(`discount badge "${input.discount.trim()}"`);
+  if (input.seal?.trim()) offerParts.push(`promotional seal/badge: "${input.seal.trim()}"`);
+  if (input.promoText?.trim()) offerParts.push(`promo text: "${input.promoText.trim()}"`);
+
+  if (offerParts.length > 0) {
+    sections.push(`Offer details: ${offerParts.join("; ")}.`);
   }
 
-  if (input.textRules === "espaco-preco") {
-    prompt += ` Leave clear empty space in the lower third for price tag and promotional text overlay. Do not render text in the image.`;
-  } else if (input.textRules === "sem-texto") {
-    prompt += ` Do not include any text, labels, or typography in the image. Pure product photography with promotional staging.`;
+  // ── Section 4: Text Elements ──
+  // Rendered text the AI should include in the image.
+  const textParts: string[] = [];
+  if (input.headline?.trim()) textParts.push(`main headline: "${input.headline.trim()}"`);
+  if (input.secondaryText?.trim()) textParts.push(`secondary text: "${input.secondaryText.trim()}"`);
+  if (input.cta?.trim()) textParts.push(`call-to-action button/label: "${input.cta.trim()}"`);
+
+  if (textParts.length > 0) {
+    sections.push(`Text elements to render in the image: ${textParts.join("; ")}. Use clear, legible typography with strong hierarchy.`);
+  }
+
+  // ── Section 5: Text Behavior ──
+  // Resolve potential conflicts between textRules and filled text fields.
+  if (input.textRules === "sem-texto" && !userHasText) {
+    // Only apply "no text" when user truly hasn't filled text fields
+    sections.push(`Do not include any text, labels, or typography in the image. Pure product photography with promotional staging.`);
+  } else if (input.textRules === "sem-texto" && userHasText) {
+    // User selected "no text" but filled text fields — prioritize the explicit text
+    sections.push(`Render only the specific text elements listed above. No additional text, labels, or watermarks.`);
+  } else if (input.textRules === "espaco-preco") {
+    if (userHasText) {
+      // User wants price area AND provided text — render the text in a dedicated price zone
+      sections.push(`Organize the composition with a clear dedicated area in the lower third for the price and offer details listed above. Render them legibly with strong contrast.`);
+    } else {
+      // No text provided — leave blank space for external overlay
+      sections.push(`Leave clear empty space in the lower third for price tag and promotional text to be added externally. Do not render placeholder text.`);
+    }
   } else if (input.textRules === "pouco-texto") {
-    prompt += ` Minimal text elements, focus on visual product presentation with space for external text overlay.`;
+    sections.push(`Minimal text elements. Focus on visual product presentation.${userHasText ? " Render only the specific text listed above." : " Leave space for external text overlay."}`);
+  } else if (input.textRules === "moderado") {
+    sections.push(`Moderate amount of text. ${userHasText ? "Render the text elements listed above with balanced prominence." : "Include typical promotional text elements."}`);
   }
 
-  if (input.applyPromoBand) {
-    prompt += ` Include a bold promotional banner strip element in the composition.`;
+  // ── Section 6: Format & Composition ──
+  const formatDesc = getFormatDescription(input.format);
+  if (formatDesc) {
+    sections.push(`Format: ${formatDesc}. Compose with product prominence, retail realism, clean hierarchy, realistic studio lighting, polished composition.`);
   }
 
-  if (input.applyUrgency) {
-    prompt += ` Add visual urgency elements like burst shapes, flash indicators, or limited-time visual cues.`;
+  // ── Section 7: Visual Style & Colors ──
+  let styleSection = `Style: ${style}. Background: ${bg}. Intensity: ${intensity}.`;
+  if (input.primaryColors?.trim()) styleSection += ` Primary colors: ${input.primaryColors.trim()}.`;
+  if (input.secondaryColors?.trim()) styleSection += ` Secondary colors: ${input.secondaryColors.trim()}.`;
+  sections.push(styleSection);
+
+  // ── Section 8: Extras ──
+  const extras: string[] = [];
+  if (input.applyPromoBand) extras.push("bold promotional banner strip");
+  if (input.applyUrgency) extras.push("visual urgency elements (burst shapes, flash indicators, limited-time cues)");
+  if (input.applyLogo) extras.push("space for brand logo placement");
+  if (extras.length > 0) {
+    sections.push(`Additional elements: ${extras.join(", ")}.`);
   }
 
-  if (input.seal) {
-    prompt += ` Feature a "${input.seal}" promotional seal/badge element.`;
+  if (input.extraInfo?.trim()) {
+    sections.push(`Special instructions: ${input.extraInfo.trim()}.`);
   }
 
-  prompt += ` The image must look like a real, professionally produced supermarket advertisement ready for social media. Part of the Comercial Sousa brand ecosystem: reliable, organized, popular with modern touch, clear communication, economy feel, strong promotional identity.`;
+  // ── Section 9: Brand Context ──
+  sections.push(
+    `The image must look like a real, professionally produced supermarket advertisement ready for social media. Part of the Comercial Sousa brand ecosystem.`
+  );
 
-  prompt += ` Negative: ${NEGATIVE_PROMPT}`;
+  // ── Section 10: Negative Prompt ──
+  sections.push(`Negative: ${NEGATIVE_PROMPT}`);
 
-  return prompt;
+  return sections.join("\n\n");
 }
 
 export function buildSimplePrompt(simpleInput: string, format?: string): string {
   const formatDesc = format ? getFormatDescription(format) : "";
-  return `Create a high-conversion Brazilian supermarket promotional image. Subject: ${simpleInput}. ${formatDesc} Style: bold popular retail advertising, high contrast, vibrant commercial colors. Composition: product-centered, realistic lighting, clean hierarchy, space for price overlay, supermarket context, social media ready, Brazilian market aesthetics. Part of the Comercial Sousa brand: reliable, organized, promotional, economy feel. Negative: ${NEGATIVE_PROMPT}`;
+  return `Create a high-conversion Brazilian supermarket promotional image.\n\nSubject: ${simpleInput}.\n\n${formatDesc ? `Format: ${formatDesc}.\n\n` : ""}Style: bold popular retail advertising, high contrast, vibrant commercial colors. Composition: product-centered, realistic lighting, clean hierarchy, space for price overlay, supermarket context, social media ready, Brazilian market aesthetics.\n\nPart of the Comercial Sousa brand.\n\nNegative: ${NEGATIVE_PROMPT}`;
 }
 
 export interface Preset {
