@@ -145,8 +145,12 @@ export default function NewGeneration() {
     const formatData = FORMATS.find((f) => f.value === input.format) || FORMATS[0];
 
     try {
+      const body: any = { prompt, width: formatData.width, height: formatData.height };
+      if (input.productImageBase64) body.productImage = input.productImageBase64;
+      if (input.backgroundImageBase64) body.backgroundImage = input.backgroundImageBase64;
+
       const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: { prompt, width: formatData.width, height: formatData.height },
+        body,
       });
 
       if (error) {
