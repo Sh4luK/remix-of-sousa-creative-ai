@@ -27,6 +27,8 @@ serve(async (req) => {
     }
 
     console.log("Generating image with prompt length:", prompt.length, "dimensions:", width, "x", height);
+    // Log first 500 chars of prompt for diagnostics
+    console.log("Prompt preview:", prompt.slice(0, 500));
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
