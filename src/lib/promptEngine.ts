@@ -196,7 +196,15 @@ export function buildPrompt(input: GenerationInput): string {
   if (input.secondaryColors?.trim()) styleSection += ` Secondary colors: ${input.secondaryColors.trim()}.`;
   sections.push(styleSection);
 
-  // ── Section 8: Extras ──
+  // ── Section 8: Image References ──
+  const imgRefs: string[] = [];
+  if (input.productImageBase64) imgRefs.push("A reference photo of the real product is attached. Use it to accurately reproduce the product's appearance, packaging, colors, and branding in the generated image.");
+  if (input.backgroundImageBase64) imgRefs.push("A custom background photo is attached. Use it as the background environment for the composition instead of the described background style.");
+  if (imgRefs.length > 0) {
+    sections.push(imgRefs.join(" "));
+  }
+
+  // ── Section 9: Extras ──
   const extras: string[] = [];
   if (input.applyPromoBand) extras.push("bold promotional banner strip");
   if (input.applyUrgency) extras.push("visual urgency elements (burst shapes, flash indicators, limited-time cues)");
@@ -209,7 +217,7 @@ export function buildPrompt(input: GenerationInput): string {
     sections.push(`Special instructions: ${input.extraInfo.trim()}.`);
   }
 
-  // ── Section 9: Brand Context ──
+  // ── Section 10: Brand Context ──
   sections.push(
     `The image must look like a real, professionally produced supermarket advertisement ready for social media. Part of the Comercial Sousa brand ecosystem.`
   );

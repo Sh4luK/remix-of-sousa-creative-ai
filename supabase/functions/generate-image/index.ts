@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, width, height } = await req.json();
+    const { prompt, width, height, productImage, backgroundImage } = await req.json();
 
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
@@ -26,9 +26,42 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Generating image with prompt length:", prompt.length, "dimensions:", width, "x", height);
-    // Log first 500 chars of prompt for diagnostics
+    const hasImages = !!(productImage || backgroundImage);
+    console.log("Generating image with prompt length:", prompt.length, "dimensions:", width, "x", height, "hasImages:", hasImages);
     console.log("Prompt preview:", prompt.slice(0, 500));
+
+    // Build message content — multimodal if images are provided
+    let messageContent: any;
+
+    if (hasImages) {
+      const parts: any[] = [{ type: "text", text: prompt }];
+
+      if (productImage) {
+        parts.push({
+          type: "text",
+          text: "📦 PRODUCT REFERENCE PHOTO (use this to accurately reproduce the product appearance, packaging, colors, and branding):",
+        });
+        parts.push({
+          type: "image_url",
+          image_url: { url: productImage },
+        });
+      }
+
+      if (backgroundImage) {
+        parts.push({
+          type: "text",
+          text: "🖼️ BACKGROUND REFERENCE PHOTO (use this as the background environment for the composition):",
+        });
+        parts.push({
+          type: "image_url",
+          image_url: { url: backgroundImage },
+        });
+      }
+
+      messageContent = parts;
+    } else {
+      messageContent = prompt;
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -41,7 +74,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: prompt,
+            content: messageContent,
           },
         ],
         modalities: ["image", "text"],

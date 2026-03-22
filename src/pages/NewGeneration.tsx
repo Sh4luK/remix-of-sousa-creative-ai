@@ -340,6 +340,74 @@ export default function NewGeneration() {
                     <Label>Texto Promocional</Label>
                     <Input value={input.promoText} onChange={(e) => update("promoText", e.target.value)} placeholder="Ex: Válido até sábado!" />
                   </div>
+
+                  {/* Image uploads */}
+                  <div className="col-span-2 grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="mb-2 block">Foto do Produto</Label>
+                      <input
+                        ref={productInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file, "product");
+                        }}
+                      />
+                      {productImagePreview ? (
+                        <div className="relative group rounded-lg overflow-hidden border border-border aspect-square">
+                          <img src={productImagePreview} alt="Produto" className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => removeImage("product")}
+                            className="absolute top-1.5 right-1.5 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => productInputRef.current?.click()}
+                          className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 transition-colors"
+                        >
+                          <ImagePlus className="h-6 w-6 text-muted-foreground mb-1" />
+                          <span className="text-xs text-muted-foreground">Adicionar foto</span>
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="mb-2 block">Foto de Fundo</Label>
+                      <input
+                        ref={backgroundInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file, "background");
+                        }}
+                      />
+                      {backgroundImagePreview ? (
+                        <div className="relative group rounded-lg overflow-hidden border border-border aspect-square">
+                          <img src={backgroundImagePreview} alt="Fundo" className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => removeImage("background")}
+                            className="absolute top-1.5 right-1.5 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => backgroundInputRef.current?.click()}
+                          className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 transition-colors"
+                        >
+                          <ImagePlus className="h-6 w-6 text-muted-foreground mb-1" />
+                          <span className="text-xs text-muted-foreground">Adicionar fundo</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </fieldset>
 
