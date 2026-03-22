@@ -59,6 +59,10 @@ export default function NewGeneration() {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [finalPrompt, setFinalPrompt] = useState<string>("");
   const [showPrompt, setShowPrompt] = useState(false);
+  const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
+  const [backgroundImagePreview, setBackgroundImagePreview] = useState<string | null>(null);
+  const productInputRef = useRef<HTMLInputElement>(null);
+  const backgroundInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const presetId = searchParams.get("preset");
