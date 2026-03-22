@@ -237,10 +237,10 @@ export default function NewGeneration() {
                   </div>
                   <div>
                     <Label>Selo</Label>
-                    <Select value={input.seal || ""} onValueChange={(v) => update("seal", v)}>
+                    <Select value={input.seal || "nenhum"} onValueChange={(v) => update("seal", v === "nenhum" ? "" : v)}>
                       <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Nenhum</SelectItem>
+                        <SelectItem value="nenhum">Nenhum</SelectItem>
                         {SEALS.map((s) => (
                           <SelectItem key={s} value={s}>{s}</SelectItem>
                         ))}
