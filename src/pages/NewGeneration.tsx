@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Sparkles, Download, RefreshCw, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Sparkles, Download, RefreshCw, Copy, ChevronDown, ChevronUp, ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
