@@ -79,6 +79,37 @@ export default function NewGeneration() {
     setInput((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleImageUpload = (file: File, type: "product" | "background") => {
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("Imagem muito grande. Máximo 4MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      if (type === "product") {
+        setProductImagePreview(base64);
+        update("productImageBase64", base64);
+      } else {
+        setBackgroundImagePreview(base64);
+        update("backgroundImageBase64", base64);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = (type: "product" | "background") => {
+    if (type === "product") {
+      setProductImagePreview(null);
+      update("productImageBase64", undefined);
+      if (productInputRef.current) productInputRef.current.value = "";
+    } else {
+      setBackgroundImagePreview(null);
+      update("backgroundImageBase64", undefined);
+      if (backgroundInputRef.current) backgroundInputRef.current.value = "";
+    }
+  };
+
   /** Validate for contradictions before generating */
   const validate = (): string | null => {
     if (!simpleMode && !input.productName.trim()) {
