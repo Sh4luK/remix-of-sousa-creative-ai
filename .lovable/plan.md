@@ -2,36 +2,39 @@
 
 ## Problema
 
-A imagem gerada não respeita o formato/proporção selecionado (1:1, 9:16, 16:9, etc.). Isso acontece por dois motivos:
+A função `buildPrompt()` em `promptEngine.ts` não inclui no prompt várias informações preenchidas pelo usuário: **preço**, **preço anterior**, **desconto**, **quantidade**, **headline**, **CTA**, e **observações extras**. Essas informações são coletadas no formulário mas nunca chegam ao modelo de IA.
 
-1. **Prompt não menciona o formato** -- a função `buildPrompt()` nunca inclui a proporção da imagem no texto do prompt enviado ao modelo.
-2. **Edge function não passa dimensões ao modelo** -- os parâmetros `width` e `height` são recebidos mas nunca enviados na requisição à AI Gateway. O modelo Gemini image preview precisa receber o aspect ratio no prompt textual, pois a API de chat completions não suporta parâmetros de dimensão diretamente.
+Além disso, o `localStorage` está estourando a cota porque as imagens base64 estão sendo armazenadas nele.
 
 ## Plano
 
-### 1. Incluir formato no prompt (promptEngine.ts)
+### 1. Incluir todos os campos no prompt (`src/lib/promptEngine.ts`)
 
-Na função `buildPrompt()`, adicionar uma linha que descreva explicitamente o aspect ratio e dimensões desejadas. Ex:
+Na função `buildPrompt()`, após a linha do produto, adicionar condicionalmente:
 
-```
-Image aspect ratio: 9:16 vertical (768x1344 pixels). Compose the image in portrait/vertical orientation.
-```
+- `price` → "Price displayed: R$ 19,90"
+- `previousPrice` → "Previous price (crossed out): R$ 24,90"  
+- `discount` → "Discount: 20%"
+- `quantity` → "Product size/volume: 5kg"
+- `headline` → "Main headline text: OFERTA IMPERDÍVEL"
+- `cta` → "Call to action: Compre já!"
+- `extraInfo` → instruções extras
 
-Mapear cada formato para uma descrição de orientação (square, portrait/vertical, landscape/horizontal).
+### 2. Corrigir erro de localStorage (`src/lib/generationStore.ts`)
 
-Fazer o mesmo na função `buildSimplePrompt()`, recebendo o formato como parâmetro.
+O localStorage está lotado porque armazena URLs base64 enormes. Soluções:
+- Adicionar `try/catch` no `saveLibrary` para não quebrar a geração
+- Limitar o tamanho da biblioteca (manter últimas 20 imagens)
+- Na falha, remover itens antigos para liberar espaço
 
-### 2. Atualizar a chamada do frontend (NewGeneration.tsx)
+### 3. Mostrar imagem mesmo com erro de storage (`src/pages/NewGeneration.tsx`)
 
-Passar o objeto de formato para `buildSimplePrompt()` para que o modo simples também respeite o formato selecionado.
-
-### 3. Reforçar no prompt do edge function (index.ts)
-
-Não há necessidade de alterar a edge function significativamente, mas podemos adicionar um system message reforçando que o modelo deve respeitar a proporção solicitada no prompt.
+Mover o `addToLibrary` para depois do `setGeneratedImage` e envolver em try/catch para que a imagem apareça mesmo se o storage falhar.
 
 ---
 
 **Arquivos a modificar:**
-- `src/lib/promptEngine.ts` -- adicionar aspect ratio ao prompt gerado
-- `src/pages/NewGeneration.tsx` -- passar formato ao `buildSimplePrompt`
+- `src/lib/promptEngine.ts` — incluir price, previousPrice, discount, quantity, headline, cta, extraInfo no prompt
+- `src/lib/generationStore.ts` — limitar tamanho e tratar erro de quota
+- `src/pages/NewGeneration.tsx` — proteger addToLibrary com try/catch
 
