@@ -113,6 +113,14 @@ export function buildPrompt(input: GenerationInput): string {
   prompt += ` Promotional intensity: ${intensity}.`;
   prompt += ` ${getFormatDescription(input.format)}`;
 
+  if (input.price) prompt += ` Price displayed prominently: ${input.price}.`;
+  if (input.previousPrice) prompt += ` Previous price (crossed out): ${input.previousPrice}.`;
+  if (input.discount) prompt += ` Discount: ${input.discount}.`;
+  if (input.quantity) prompt += ` Product size/volume: ${input.quantity}.`;
+  if (input.headline) prompt += ` Main headline text: "${input.headline}".`;
+  if (input.cta) prompt += ` Call to action text: "${input.cta}".`;
+  if (input.extraInfo) prompt += ` Additional instructions: ${input.extraInfo}.`;
+
   prompt += ` Composition focused on product prominence, retail realism, high visual appeal, strong commercial intention, clean background hierarchy, realistic studio lighting, premium supermarket advertising look, strong contrast, polished composition, Brazilian market aesthetics.`;
 
   if (input.primaryColors) {

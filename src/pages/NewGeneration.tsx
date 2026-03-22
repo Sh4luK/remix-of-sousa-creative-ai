@@ -115,14 +115,18 @@ export default function NewGeneration() {
       if (!data?.imageUrl) throw new Error("Nenhuma imagem retornada");
 
       setGeneratedImage(data.imageUrl);
-      addToLibrary({
-        imageUrl: data.imageUrl,
-        prompt,
-        productName: simpleMode ? simplePrompt : input.productName,
-        category: input.category,
-        style: input.style,
-        format: input.format,
-      });
+      try {
+        addToLibrary({
+          imageUrl: data.imageUrl,
+          prompt,
+          productName: simpleMode ? simplePrompt : input.productName,
+          category: input.category,
+          style: input.style,
+          format: input.format,
+        });
+      } catch {
+        // Storage full — image still shown to user
+      }
       toast.success("Arte gerada com sucesso!");
     } catch (err: any) {
       console.error("Generation error:", err);

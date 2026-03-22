@@ -14,6 +14,7 @@ export interface GeneratedImage {
 }
 
 const STORAGE_KEY = "sousa-creative-library";
+const MAX_LIBRARY_SIZE = 20;
 
 function loadLibrary(): GeneratedImage[] {
   try {
@@ -25,7 +26,23 @@ function loadLibrary(): GeneratedImage[] {
 }
 
 function saveLibrary(items: GeneratedImage[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  try {
+    // Keep only the most recent items
+    const trimmed = items
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, MAX_LIBRARY_SIZE);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+  } catch {
+    // If still over quota, try removing oldest items progressively
+    try {
+      const minimal = items
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+    } catch {
+      // Give up on persistence silently
+    }
+  }
 }
 
 export function getLibrary(): GeneratedImage[] {
