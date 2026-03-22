@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Sparkles, Download, RefreshCw, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Sparkles, Download, RefreshCw, Copy, ChevronDown, ChevronUp, ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +59,10 @@ export default function NewGeneration() {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [finalPrompt, setFinalPrompt] = useState<string>("");
   const [showPrompt, setShowPrompt] = useState(false);
+  const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
+  const [backgroundImagePreview, setBackgroundImagePreview] = useState<string | null>(null);
+  const productInputRef = useRef<HTMLInputElement>(null);
+  const backgroundInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const presetId = searchParams.get("preset");
@@ -73,6 +77,37 @@ export default function NewGeneration() {
 
   const update = (key: keyof GenerationInput, value: any) => {
     setInput((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleImageUpload = (file: File, type: "product" | "background") => {
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("Imagem muito grande. Máximo 4MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      if (type === "product") {
+        setProductImagePreview(base64);
+        update("productImageBase64", base64);
+      } else {
+        setBackgroundImagePreview(base64);
+        update("backgroundImageBase64", base64);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = (type: "product" | "background") => {
+    if (type === "product") {
+      setProductImagePreview(null);
+      update("productImageBase64", undefined);
+      if (productInputRef.current) productInputRef.current.value = "";
+    } else {
+      setBackgroundImagePreview(null);
+      update("backgroundImageBase64", undefined);
+      if (backgroundInputRef.current) backgroundInputRef.current.value = "";
+    }
   };
 
   /** Validate for contradictions before generating */
@@ -110,8 +145,12 @@ export default function NewGeneration() {
     const formatData = FORMATS.find((f) => f.value === input.format) || FORMATS[0];
 
     try {
+      const body: any = { prompt, width: formatData.width, height: formatData.height };
+      if (input.productImageBase64) body.productImage = input.productImageBase64;
+      if (input.backgroundImageBase64) body.backgroundImage = input.backgroundImageBase64;
+
       const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: { prompt, width: formatData.width, height: formatData.height },
+        body,
       });
 
       if (error) {
@@ -300,6 +339,74 @@ export default function NewGeneration() {
                   <div className="col-span-2">
                     <Label>Texto Promocional</Label>
                     <Input value={input.promoText} onChange={(e) => update("promoText", e.target.value)} placeholder="Ex: Válido até sábado!" />
+                  </div>
+
+                  {/* Image uploads */}
+                  <div className="col-span-2 grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="mb-2 block">Foto do Produto</Label>
+                      <input
+                        ref={productInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file, "product");
+                        }}
+                      />
+                      {productImagePreview ? (
+                        <div className="relative group rounded-lg overflow-hidden border border-border aspect-square">
+                          <img src={productImagePreview} alt="Produto" className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => removeImage("product")}
+                            className="absolute top-1.5 right-1.5 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => productInputRef.current?.click()}
+                          className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 transition-colors"
+                        >
+                          <ImagePlus className="h-6 w-6 text-muted-foreground mb-1" />
+                          <span className="text-xs text-muted-foreground">Adicionar foto</span>
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="mb-2 block">Foto de Fundo</Label>
+                      <input
+                        ref={backgroundInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file, "background");
+                        }}
+                      />
+                      {backgroundImagePreview ? (
+                        <div className="relative group rounded-lg overflow-hidden border border-border aspect-square">
+                          <img src={backgroundImagePreview} alt="Fundo" className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => removeImage("background")}
+                            className="absolute top-1.5 right-1.5 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => backgroundInputRef.current?.click()}
+                          className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 transition-colors"
+                        >
+                          <ImagePlus className="h-6 w-6 text-muted-foreground mb-1" />
+                          <span className="text-xs text-muted-foreground">Adicionar fundo</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </fieldset>
