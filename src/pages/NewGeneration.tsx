@@ -88,7 +88,7 @@ export default function NewGeneration() {
     setLoading(true);
     setGeneratedImage(null);
 
-    const prompt = simpleMode ? buildSimplePrompt(simplePrompt) : buildPrompt(input);
+    const prompt = simpleMode ? buildSimplePrompt(simplePrompt, input.format) : buildPrompt(input);
     setFinalPrompt(prompt);
 
     const formatData = FORMATS.find((f) => f.value === input.format) || FORMATS[0];

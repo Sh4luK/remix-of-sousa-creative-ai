@@ -89,6 +89,16 @@ const CATEGORY_CONTEXT: Record<string, string> = {
 
 const NEGATIVE_PROMPT = "avoid distorted packaging, broken typography, unreadable labels, unrealistic anatomy, duplicated items, messy composition, low contrast, blurred product, fake supermarket environment, overly artistic abstract style, childish design, cluttered layout, poor lighting, incorrect brand rendering, malformed objects, exaggerated surrealism, deformed hands, text errors, watermarks";
 
+function getFormatDescription(format: string): string {
+  const fmt = FORMATS.find(f => f.value === format);
+  if (!fmt) return "";
+  const ratio = fmt.width / fmt.height;
+  let orientation = "square composition";
+  if (ratio > 1.05) orientation = "landscape/horizontal orientation";
+  else if (ratio < 0.95) orientation = "portrait/vertical orientation";
+  return `Image aspect ratio: ${fmt.value} (${fmt.width}x${fmt.height} pixels). Compose the image in ${orientation}.`;
+}
+
 export function buildPrompt(input: GenerationInput): string {
   const style = STYLE_MAP[input.style] || STYLE_MAP["promocional-popular"];
   const bg = BACKGROUND_MAP[input.background] || BACKGROUND_MAP["estudio-clean"];
@@ -101,6 +111,7 @@ export function buildPrompt(input: GenerationInput): string {
   prompt += ` Advertising style: ${style}.`;
   prompt += ` Background: ${bg}.`;
   prompt += ` Promotional intensity: ${intensity}.`;
+  prompt += ` ${getFormatDescription(input.format)}`;
 
   prompt += ` Composition focused on product prominence, retail realism, high visual appeal, strong commercial intention, clean background hierarchy, realistic studio lighting, premium supermarket advertising look, strong contrast, polished composition, Brazilian market aesthetics.`;
 
@@ -135,8 +146,9 @@ export function buildPrompt(input: GenerationInput): string {
   return prompt;
 }
 
-export function buildSimplePrompt(simpleInput: string): string {
-  return `Create a high-conversion Brazilian supermarket promotional image. Subject: ${simpleInput}. Style: bold popular retail advertising, high contrast, vibrant commercial colors. Composition: product-centered, realistic lighting, clean hierarchy, space for price overlay, supermarket context, social media ready, Brazilian market aesthetics. Part of the Comercial Sousa brand: reliable, organized, promotional, economy feel. Negative: ${NEGATIVE_PROMPT}`;
+export function buildSimplePrompt(simpleInput: string, format?: string): string {
+  const formatDesc = format ? getFormatDescription(format) : "";
+  return `Create a high-conversion Brazilian supermarket promotional image. Subject: ${simpleInput}. ${formatDesc} Style: bold popular retail advertising, high contrast, vibrant commercial colors. Composition: product-centered, realistic lighting, clean hierarchy, space for price overlay, supermarket context, social media ready, Brazilian market aesthetics. Part of the Comercial Sousa brand: reliable, organized, promotional, economy feel. Negative: ${NEGATIVE_PROMPT}`;
 }
 
 export interface Preset {
