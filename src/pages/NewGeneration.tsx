@@ -98,7 +98,19 @@ export default function NewGeneration() {
         body: { prompt, width: formatData.width, height: formatData.height },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for specific HTTP status codes from the edge function
+        const context = (error as any)?.context;
+        if (context?.status === 402) {
+          const body = await context.json?.() ?? {};
+          throw new Error(body.error || "Créditos insuficientes. Adicione créditos em Settings → Workspace → Usage.");
+        }
+        if (context?.status === 429) {
+          const body = await context.json?.() ?? {};
+          throw new Error(body.error || "Muitas requisições. Aguarde um momento e tente novamente.");
+        }
+        throw error;
+      }
       if (data?.error) throw new Error(data.error);
       if (!data?.imageUrl) throw new Error("Nenhuma imagem retornada");
 
@@ -114,7 +126,14 @@ export default function NewGeneration() {
       toast.success("Arte gerada com sucesso!");
     } catch (err: any) {
       console.error("Generation error:", err);
-      toast.error(err.message || "Erro ao gerar imagem");
+      const msg = err.message || "Erro ao gerar imagem";
+      if (msg.includes("Créditos") || msg.includes("créditos")) {
+        toast.error("💳 " + msg, { duration: 8000 });
+      } else if (msg.includes("429") || msg.includes("requisições")) {
+        toast.error("⏳ " + msg, { duration: 5000 });
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
