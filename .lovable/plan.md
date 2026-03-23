@@ -1,46 +1,29 @@
 
 
-## Adicionar Upload de Foto do Produto e Foto de Fundo
+## Usar logo Comercial Sousa na aplicação e nas imagens geradas
 
-O modelo Gemini 3.1 Flash Image suporta imagens como input via mensagens multimodais. Vamos permitir que o usuário envie uma foto do produto e/ou uma foto de fundo, que serão enviadas junto com o prompt textual para que a IA use como referência na geração.
+### O que será feito
 
-### Plano
+1. **Copiar a logo para o projeto** — salvar em `src/assets/logo-comercial-sousa.png` para uso na UI e em `public/logo-comercial-sousa.png` para referência no prompt.
 
-#### 1. Criar bucket de storage para uploads temporários
-- Criar um bucket público `generation-uploads` para armazenar as imagens enviadas pelo usuário temporariamente
-- Adicionar RLS para permitir uploads anônimos (são imagens temporárias de referência)
+2. **Atualizar o layout da aplicação (`src/components/AppLayout.tsx`)**
+   - Substituir o ícone Sparkles pela imagem da logo no sidebar header.
+   - Usar a logo também no header mobile.
 
-#### 2. Atualizar o formulário (`src/pages/NewGeneration.tsx`)
-- Adicionar dois campos de upload de imagem no fieldset "Dados do Produto":
-  - **Foto do Produto** — imagem de referência do produto real
-  - **Foto de Fundo** — imagem de fundo personalizada
-- Cada campo terá preview da imagem selecionada e botão para remover
-- As imagens serão convertidas para base64 no cliente antes do envio
+3. **Atualizar o favicon/título (`index.html`)**
+   - Atualizar o título da página para "Sousa Creative AI".
 
-#### 3. Atualizar a interface `GenerationInput` (`src/lib/promptEngine.ts`)
-- Adicionar campos opcionais `productImageBase64` e `backgroundImageBase64`
-- Atualizar `buildPrompt()` para mencionar no texto que há imagens de referência anexadas
-
-#### 4. Atualizar a edge function (`supabase/functions/generate-image/index.ts`)
-- Receber os campos `productImage` e `backgroundImage` (base64) no body
-- Construir a mensagem multimodal com `content` como array contendo blocos de texto e `image_url` para cada imagem fornecida
-- Adicionar instruções contextuais: "Use this product photo as reference" e "Use this as the background"
+4. **Enviar a logo automaticamente em todas as gerações**
+   - No `src/pages/NewGeneration.tsx`: quando `applyLogo` estiver ativo (já é `true` por padrão), carregar a logo como base64 e enviá-la junto na requisição como um campo `logoImage`.
+   - No `supabase/functions/generate-image/index.ts`: receber `logoImage` e adicioná-lo como parte multimodal com instrução "Place this brand logo visibly in the image composition".
+   - No `src/lib/promptEngine.ts`: quando `applyLogo` estiver ativo, instruir no prompt para incluir a logo da marca "Comercial Sousa Atacarejo" de forma visível e integrada à composição.
 
 ### Arquivos a modificar
-- `src/lib/promptEngine.ts` — adicionar campos de imagem à interface e ao prompt textual
-- `src/pages/NewGeneration.tsx` — campos de upload com preview e conversão base64
-- `supabase/functions/generate-image/index.ts` — mensagem multimodal com imagens
-
-### Detalhes técnicos
-
-A mensagem enviada ao modelo passará de string simples para array multimodal:
-```text
-content: [
-  { type: "text", text: "..." },
-  { type: "image_url", image_url: { url: "data:image/png;base64,..." } },  // produto
-  { type: "image_url", image_url: { url: "data:image/png;base64,..." } },  // fundo
-]
-```
-
-Não será necessário bucket de storage — as imagens serão enviadas diretamente como base64 inline, mantendo o fluxo simples e sem dependência de URLs externas.
+- `src/assets/logo-comercial-sousa.png` — novo arquivo (cópia da imagem enviada)
+- `public/logo-comercial-sousa.png` — novo arquivo para acesso direto
+- `src/components/AppLayout.tsx` — trocar ícone pela logo
+- `index.html` — título
+- `src/pages/NewGeneration.tsx` — carregar e enviar logo base64 automaticamente
+- `supabase/functions/generate-image/index.ts` — receber e incluir logo como imagem multimodal
+- `src/lib/promptEngine.ts` — reforçar instrução de logo no prompt
 
