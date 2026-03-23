@@ -26,7 +26,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const hasImages = !!(productImage || backgroundImage);
+    const hasImages = !!(productImage || backgroundImage || logoImage);
     console.log("Generating image with prompt length:", prompt.length, "dimensions:", width, "x", height, "hasImages:", hasImages);
     console.log("Prompt preview:", prompt.slice(0, 500));
 
