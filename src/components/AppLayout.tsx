@@ -10,8 +10,8 @@ import {
   Palette,
   Menu,
   X,
-  Sparkles,
 } from "lucide-react";
+import logoImg from "@/assets/logo-comercial-sousa.png";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
