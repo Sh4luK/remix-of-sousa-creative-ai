@@ -10,8 +10,8 @@ import {
   Palette,
   Menu,
   X,
-  Sparkles,
 } from "lucide-react";
+import logoImg from "@/assets/logo-comercial-sousa.png";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -44,9 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }`}
       >
         <div className="flex h-16 items-center gap-2.5 px-5 border-b border-sidebar-border">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg promo-gradient">
-            <Sparkles className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src={logoImg} alt="Comercial Sousa" className="h-9 w-9 rounded-lg object-contain" />
           <div>
             <h1 className="text-sm font-bold text-sidebar-primary-foreground leading-none">
               Sousa Creative
@@ -101,6 +99,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </button>
+          <img src={logoImg} alt="Comercial Sousa" className="h-7 w-7 rounded object-contain" />
           <span className="font-semibold text-sm">Sousa Creative AI</span>
         </header>
 

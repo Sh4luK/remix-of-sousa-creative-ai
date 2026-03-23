@@ -149,6 +149,22 @@ export default function NewGeneration() {
       if (input.productImageBase64) body.productImage = input.productImageBase64;
       if (input.backgroundImageBase64) body.backgroundImage = input.backgroundImageBase64;
 
+      // Auto-attach logo when applyLogo is enabled
+      if (input.applyLogo) {
+        try {
+          const logoResp = await fetch("/logo-comercial-sousa.png");
+          const logoBlob = await logoResp.blob();
+          const logoBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(logoBlob);
+          });
+          body.logoImage = logoBase64;
+        } catch (e) {
+          console.warn("Could not load logo for generation:", e);
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke("generate-image", {
         body,
       });

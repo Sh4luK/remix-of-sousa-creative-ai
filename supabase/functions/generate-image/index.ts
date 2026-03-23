@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, width, height, productImage, backgroundImage } = await req.json();
+    const { prompt, width, height, productImage, backgroundImage, logoImage } = await req.json();
 
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
@@ -26,7 +26,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const hasImages = !!(productImage || backgroundImage);
+    const hasImages = !!(productImage || backgroundImage || logoImage);
     console.log("Generating image with prompt length:", prompt.length, "dimensions:", width, "x", height, "hasImages:", hasImages);
     console.log("Prompt preview:", prompt.slice(0, 500));
 
@@ -55,6 +55,17 @@ serve(async (req) => {
         parts.push({
           type: "image_url",
           image_url: { url: backgroundImage },
+        });
+      }
+
+      if (logoImage) {
+        parts.push({
+          type: "text",
+          text: "🏷️ BRAND LOGO (place this logo visibly in the generated image, integrated into the composition, preferably in a corner or header area):",
+        });
+        parts.push({
+          type: "image_url",
+          image_url: { url: logoImage },
         });
       }
 
