@@ -99,6 +99,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </button>
+          <img src={logoImg} alt="Comercial Sousa" className="h-7 w-7 rounded object-contain" />
           <span className="font-semibold text-sm">Sousa Creative AI</span>
         </header>
 

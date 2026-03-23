@@ -58,6 +58,17 @@ serve(async (req) => {
         });
       }
 
+      if (logoImage) {
+        parts.push({
+          type: "text",
+          text: "🏷️ BRAND LOGO (place this logo visibly in the generated image, integrated into the composition, preferably in a corner or header area):",
+        });
+        parts.push({
+          type: "image_url",
+          image_url: { url: logoImage },
+        });
+      }
+
       messageContent = parts;
     } else {
       messageContent = prompt;

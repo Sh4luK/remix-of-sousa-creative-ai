@@ -209,6 +209,9 @@ export function buildPrompt(input: GenerationInput): string {
   if (input.applyPromoBand) extras.push("bold promotional banner strip");
   if (input.applyUrgency) extras.push("visual urgency elements (burst shapes, flash indicators, limited-time cues)");
   if (input.applyLogo) extras.push("space for brand logo placement");
+  if (input.applyLogo) {
+    extras.push("the Comercial Sousa Atacarejo brand logo (attached as reference image) must be placed visibly and integrated into the composition, preferably in a corner or header area without obstructing the product");
+  }
   if (extras.length > 0) {
     sections.push(`Additional elements: ${extras.join(", ")}.`);
   }
