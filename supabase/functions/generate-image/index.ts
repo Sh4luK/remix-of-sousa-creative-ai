@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, width, height, productImage, backgroundImage } = await req.json();
+    const { prompt, width, height, productImage, backgroundImage, logoImage } = await req.json();
 
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
