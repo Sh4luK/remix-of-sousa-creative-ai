@@ -35,8 +35,8 @@ export default function Dashboard() {
         <Link to="/presets">
           <div className="group relative overflow-hidden rounded-xl bg-card border border-border p-5 transition-all duration-200 hover:shadow-md hover:border-primary/20 active:scale-[0.98]">
             <Layers className="h-8 w-8 mb-3 text-primary" />
-            <h3 className="font-bold text-lg">Modelos Prontos</h3>
-            <p className="text-sm text-muted-foreground mt-1">{PRESETS.length} templates disponíveis</p>
+            <h3 className="font-bold text-lg">Estilos de Arte</h3>
+            <p className="text-sm text-muted-foreground mt-1">{PRESETS.length} estilos prontos para usar</p>
             <ArrowRight className="absolute bottom-5 right-5 h-5 w-5 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>
