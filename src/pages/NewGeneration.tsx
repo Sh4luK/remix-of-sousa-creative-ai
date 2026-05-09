@@ -39,7 +39,8 @@ const SEARCH_SUGGESTIONS = ["Arroz", "Refrigerante", "Café", "Cerveja", "Óleo"
 
 type ProductPick =
   | { kind: "catalog"; id: string; name: string; category: string; emoji: string }
-  | { kind: "upload"; name: string; previewUrl: string; base64: string };
+  | { kind: "upload"; name: string; previewUrl: string; base64: string }
+  | { kind: "custom"; name: string };
 
 // Cards visuais de estilo — agora com prévia de gradiente (mock visual do encarte)
 const STYLE_CARDS = [
