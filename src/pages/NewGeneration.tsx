@@ -176,6 +176,48 @@ export default function NewGeneration() {
     reader.readAsDataURL(file);
   };
 
+  // Modo Mágico por Voz: transcreve → autopreenche → avança para Etapa 2
+  const handleVoiceTranscript = (transcript: string) => {
+    const { product, price } = parseVoiceTranscript(transcript);
+
+    if (!product && !price) {
+      toast.error('Não entendemos. Tente: "Arroz 5kg por 25 reais".');
+      return;
+    }
+
+    let matched = false;
+    if (product) {
+      const lower = product.toLowerCase();
+      const fromCatalog = MOCK_PRODUCTS.find((p) =>
+        lower.split(/\s+/).some((tk) => tk.length > 2 && p.name.toLowerCase().includes(tk)),
+      );
+      if (fromCatalog) {
+        setPick({
+          kind: "catalog",
+          id: fromCatalog.id,
+          name: fromCatalog.name,
+          category: fromCatalog.category,
+          emoji: fromCatalog.emoji,
+        });
+        setSearch(fromCatalog.name);
+        matched = true;
+      }
+    }
+
+    if (!matched && product) {
+      setPick({ kind: "custom", name: product });
+      setSearch(product);
+    }
+
+    if (price) setCurrentPrice(`R$ ${price}`);
+
+    toast.success("Áudio compreendido! Confirmando os dados...");
+
+    if (product) {
+      setTimeout(() => setStep(2), 600);
+    }
+  };
+
   // Avança/volta
   const canAdvanceFrom1 = !!pick;
   const canAdvanceFrom2 = currentPrice.trim().length > 0;
