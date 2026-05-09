@@ -726,8 +726,10 @@ function Step2({
         <div className="h-16 w-16 rounded-lg bg-white border border-slate-200 flex items-center justify-center overflow-hidden text-3xl">
           {pick.kind === "upload" ? (
             <img src={pick.previewUrl} alt={pick.name} className="h-full w-full object-cover" />
-          ) : (
+          ) : pick.kind === "catalog" ? (
             <span>{pick.emoji}</span>
+          ) : (
+            <span>🎤</span>
           )}
         </div>
         <div className="flex-1">
