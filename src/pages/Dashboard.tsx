@@ -5,6 +5,25 @@ import { Button } from "@/components/ui/button";
 import { getLibrary } from "@/lib/generationStore";
 import { PRESETS } from "@/lib/promptEngine";
 
+const BUSINESS_LABELS: Record<string, string> = {
+  "oferta-popular": "Oferta de Supermercado",
+  "premium-clean": "Post Elegante",
+  "atacarejo": "Oferta de Atacado",
+  "descartaveis": "Descartáveis em Destaque",
+  "bebidas-geladas": "Bebidas Geladas",
+  "combo-promo": "Combos e Kits",
+  "acougue": "Oferta de Açougue",
+  "story-promo": "Story para Instagram",
+  "tabloide": "Encarte Digital",
+  "whatsapp": "Arte para WhatsApp",
+  "inauguracao": "Inauguração",
+  "queima-estoque": "Queima de Estoque",
+};
+
+function getBusinessLabel(presetId: string): string {
+  return BUSINESS_LABELS[presetId] || presetId;
+}
+
 export default function Dashboard() {
   const library = getLibrary();
   const recentImages = library.slice(0, 6);
