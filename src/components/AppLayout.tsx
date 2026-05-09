@@ -6,19 +6,16 @@ import {
   Image,
   Layers,
   Settings,
-  History,
   Palette,
   Menu,
-  X,
 } from "lucide-react";
 import logoImg from "@/assets/logo-comercial-sousa.png";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/", label: "Início", icon: LayoutDashboard },
   { to: "/nova-arte", label: "Nova Arte", icon: PlusCircle },
-  { to: "/biblioteca", label: "Biblioteca", icon: Image },
-  { to: "/presets", label: "Modelos Prontos", icon: Layers },
-  { to: "/historico", label: "Histórico", icon: History },
+  { to: "/presets", label: "Estilos de Arte", icon: Layers },
+  { to: "/biblioteca", label: "Minhas Artes", icon: Image },
   { to: "/marca", label: "Config. Marca", icon: Palette },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
@@ -78,12 +75,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="border-t border-sidebar-border p-4">
-          <div className="rounded-lg bg-sidebar-accent p-3">
+          <div className="rounded-lg bg-sidebar-accent p-3 flex items-center gap-2">
+            <span className="text-xs">✨</span>
             <p className="text-xs font-medium text-sidebar-accent-foreground/80">
-              Comercial Sousa
-            </p>
-            <p className="text-[11px] text-sidebar-foreground/50 mt-0.5">
-              Motor: Nano Banana 2
+              IA Ativada
             </p>
           </div>
         </div>

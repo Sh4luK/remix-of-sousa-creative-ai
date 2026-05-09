@@ -5,6 +5,25 @@ import { Button } from "@/components/ui/button";
 import { getLibrary } from "@/lib/generationStore";
 import { PRESETS } from "@/lib/promptEngine";
 
+const BUSINESS_LABELS: Record<string, string> = {
+  "oferta-popular": "Oferta de Supermercado",
+  "premium-clean": "Post Elegante",
+  "atacarejo": "Oferta de Atacado",
+  "descartaveis": "Descartáveis em Destaque",
+  "bebidas-geladas": "Bebidas Geladas",
+  "combo-promo": "Combos e Kits",
+  "acougue": "Oferta de Açougue",
+  "story-promo": "Story para Instagram",
+  "tabloide": "Encarte Digital",
+  "whatsapp": "Arte para WhatsApp",
+  "inauguracao": "Inauguração",
+  "queima-estoque": "Queima de Estoque",
+};
+
+function getBusinessLabel(presetId: string): string {
+  return BUSINESS_LABELS[presetId] || presetId;
+}
+
 export default function Dashboard() {
   const library = getLibrary();
   const recentImages = library.slice(0, 6);
@@ -35,8 +54,8 @@ export default function Dashboard() {
         <Link to="/presets">
           <div className="group relative overflow-hidden rounded-xl bg-card border border-border p-5 transition-all duration-200 hover:shadow-md hover:border-primary/20 active:scale-[0.98]">
             <Layers className="h-8 w-8 mb-3 text-primary" />
-            <h3 className="font-bold text-lg">Modelos Prontos</h3>
-            <p className="text-sm text-muted-foreground mt-1">{PRESETS.length} templates disponíveis</p>
+            <h3 className="font-bold text-lg">Estilos de Arte</h3>
+            <p className="text-sm text-muted-foreground mt-1">{PRESETS.length} estilos prontos para usar</p>
             <ArrowRight className="absolute bottom-5 right-5 h-5 w-5 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>
@@ -44,7 +63,7 @@ export default function Dashboard() {
         <Link to="/biblioteca">
           <div className="group relative overflow-hidden rounded-xl bg-card border border-border p-5 transition-all duration-200 hover:shadow-md hover:border-primary/20 active:scale-[0.98]">
             <Image className="h-8 w-8 mb-3 text-accent" />
-            <h3 className="font-bold text-lg">Biblioteca</h3>
+            <h3 className="font-bold text-lg">Minhas Artes</h3>
             <p className="text-sm text-muted-foreground mt-1">{library.length} artes salvas</p>
             <ArrowRight className="absolute bottom-5 right-5 h-5 w-5 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
           </div>
@@ -70,7 +89,7 @@ export default function Dashboard() {
               className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 text-center transition-all duration-200 hover:shadow-md hover:border-primary/20 active:scale-[0.97]"
             >
               <span className="text-2xl">{preset.icon}</span>
-              <span className="text-xs font-medium leading-tight">{preset.name}</span>
+              <span className="text-xs font-medium leading-tight">{getBusinessLabel(preset.id)}</span>
             </Link>
           ))}
         </div>
