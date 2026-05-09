@@ -459,6 +459,7 @@ export default function NewGeneration() {
               setPick={setPick}
               uploadRef={uploadRef}
               onUpload={handleUpload}
+              onVoice={handleVoiceTranscript}
             />
           )}
 
