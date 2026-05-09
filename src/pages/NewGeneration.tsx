@@ -14,6 +14,8 @@ import {
   buildPrompt, FORMATS, PRESETS, type GenerationInput,
 } from "@/lib/promptEngine";
 import { addToLibrary } from "@/lib/generationStore";
+import { VoiceMagicButton } from "@/components/VoiceMagicButton";
+import { parseVoiceTranscript } from "@/lib/voiceParser";
 
 // ────────────────────────────────────────────────────────────
 // Catálogo simulado (futura consulta ao Supabase)
@@ -37,7 +39,8 @@ const SEARCH_SUGGESTIONS = ["Arroz", "Refrigerante", "Café", "Cerveja", "Óleo"
 
 type ProductPick =
   | { kind: "catalog"; id: string; name: string; category: string; emoji: string }
-  | { kind: "upload"; name: string; previewUrl: string; base64: string };
+  | { kind: "upload"; name: string; previewUrl: string; base64: string }
+  | { kind: "custom"; name: string };
 
 // Cards visuais de estilo — agora com prévia de gradiente (mock visual do encarte)
 const STYLE_CARDS = [
@@ -171,6 +174,48 @@ export default function NewGeneration() {
       toast.success("Foto enviada!");
     };
     reader.readAsDataURL(file);
+  };
+
+  // Modo Mágico por Voz: transcreve → autopreenche → avança para Etapa 2
+  const handleVoiceTranscript = (transcript: string) => {
+    const { product, price } = parseVoiceTranscript(transcript);
+
+    if (!product && !price) {
+      toast.error('Não entendemos. Tente: "Arroz 5kg por 25 reais".');
+      return;
+    }
+
+    let matched = false;
+    if (product) {
+      const lower = product.toLowerCase();
+      const fromCatalog = MOCK_PRODUCTS.find((p) =>
+        lower.split(/\s+/).some((tk) => tk.length > 2 && p.name.toLowerCase().includes(tk)),
+      );
+      if (fromCatalog) {
+        setPick({
+          kind: "catalog",
+          id: fromCatalog.id,
+          name: fromCatalog.name,
+          category: fromCatalog.category,
+          emoji: fromCatalog.emoji,
+        });
+        setSearch(fromCatalog.name);
+        matched = true;
+      }
+    }
+
+    if (!matched && product) {
+      setPick({ kind: "custom", name: product });
+      setSearch(product);
+    }
+
+    if (price) setCurrentPrice(`R$ ${price}`);
+
+    toast.success("Áudio compreendido! Confirmando os dados...");
+
+    if (product) {
+      setTimeout(() => setStep(2), 600);
+    }
   };
 
   // Avança/volta
@@ -414,6 +459,7 @@ export default function NewGeneration() {
               setPick={setPick}
               uploadRef={uploadRef}
               onUpload={handleUpload}
+              onVoice={handleVoiceTranscript}
             />
           )}
 
@@ -547,7 +593,7 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
 // ETAPA 1 – Produto
 // ──────────────────────────────────────────────────────────────
 function Step1({
-  search, setSearch, matches, pick, setPick, uploadRef, onUpload,
+  search, setSearch, matches, pick, setPick, uploadRef, onUpload, onVoice,
 }: {
   search: string; setSearch: (v: string) => void;
   matches: typeof MOCK_PRODUCTS;
@@ -555,6 +601,7 @@ function Step1({
   setPick: (p: ProductPick | null) => void;
   uploadRef: React.RefObject<HTMLInputElement>;
   onUpload: (f: File) => void;
+  onVoice: (transcript: string) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -565,6 +612,18 @@ function Step1({
         <p className="text-sm text-slate-500 mt-1">
           Busque no nosso catálogo ou envie uma foto sua.
         </p>
+      </div>
+
+      {/* 🎤 Modo Mágico por Voz — atalho para preencher tudo falando */}
+      <VoiceMagicButton onResult={onVoice} />
+
+      {/* Separador "ou digite" */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+          ou digite
+        </span>
+        <div className="flex-1 h-px bg-slate-200" />
       </div>
 
       <TipBar>
@@ -723,8 +782,10 @@ function Step2({
         <div className="h-16 w-16 rounded-lg bg-white border border-slate-200 flex items-center justify-center overflow-hidden text-3xl">
           {pick.kind === "upload" ? (
             <img src={pick.previewUrl} alt={pick.name} className="h-full w-full object-cover" />
-          ) : (
+          ) : pick.kind === "catalog" ? (
             <span>{pick.emoji}</span>
+          ) : (
+            <span>🎤</span>
           )}
         </div>
         <div className="flex-1">
