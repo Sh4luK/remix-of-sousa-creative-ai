@@ -14,11 +14,10 @@ import {
 import logoImg from "@/assets/logo-comercial-sousa.png";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/", label: "Início", icon: LayoutDashboard },
   { to: "/nova-arte", label: "Nova Arte", icon: PlusCircle },
-  { to: "/biblioteca", label: "Biblioteca", icon: Image },
-  { to: "/presets", label: "Modelos Prontos", icon: Layers },
-  { to: "/historico", label: "Histórico", icon: History },
+  { to: "/presets", label: "Estilos de Arte", icon: Layers },
+  { to: "/biblioteca", label: "Minhas Artes", icon: Image },
   { to: "/marca", label: "Config. Marca", icon: Palette },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
