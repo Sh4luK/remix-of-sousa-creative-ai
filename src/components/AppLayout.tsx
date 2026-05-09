@@ -6,10 +6,8 @@ import {
   Image,
   Layers,
   Settings,
-  History,
   Palette,
   Menu,
-  X,
 } from "lucide-react";
 import logoImg from "@/assets/logo-comercial-sousa.png";
 
