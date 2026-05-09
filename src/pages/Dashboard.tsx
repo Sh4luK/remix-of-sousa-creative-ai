@@ -63,7 +63,7 @@ export default function Dashboard() {
         <Link to="/biblioteca">
           <div className="group relative overflow-hidden rounded-xl bg-card border border-border p-5 transition-all duration-200 hover:shadow-md hover:border-primary/20 active:scale-[0.98]">
             <Image className="h-8 w-8 mb-3 text-accent" />
-            <h3 className="font-bold text-lg">Biblioteca</h3>
+            <h3 className="font-bold text-lg">Minhas Artes</h3>
             <p className="text-sm text-muted-foreground mt-1">{library.length} artes salvas</p>
             <ArrowRight className="absolute bottom-5 right-5 h-5 w-5 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
           </div>
@@ -89,7 +89,7 @@ export default function Dashboard() {
               className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 text-center transition-all duration-200 hover:shadow-md hover:border-primary/20 active:scale-[0.97]"
             >
               <span className="text-2xl">{preset.icon}</span>
-              <span className="text-xs font-medium leading-tight">{preset.name}</span>
+              <span className="text-xs font-medium leading-tight">{getBusinessLabel(preset.id)}</span>
             </Link>
           ))}
         </div>
