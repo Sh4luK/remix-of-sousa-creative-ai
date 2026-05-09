@@ -614,6 +614,18 @@ function Step1({
         </p>
       </div>
 
+      {/* 🎤 Modo Mágico por Voz — atalho para preencher tudo falando */}
+      <VoiceMagicButton onResult={onVoice} />
+
+      {/* Separador "ou digite" */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+          ou digite
+        </span>
+        <div className="flex-1 h-px bg-slate-200" />
+      </div>
+
       <TipBar>
         Não precisa ter foto profissional. Uma foto tirada com seu celular já funciona muito bem.
       </TipBar>
