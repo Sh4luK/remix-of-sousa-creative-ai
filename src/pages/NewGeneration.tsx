@@ -1,653 +1,692 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Sparkles, Download, RefreshCw, Copy, ChevronDown, ChevronUp, ImagePlus, X } from "lucide-react";
+import {
+  Search, Upload, ChevronLeft, ChevronRight, Sparkles, Check,
+  ChevronDown, ChevronUp, Download, RefreshCw, X, Image as ImageIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  buildPrompt,
-  buildSimplePrompt,
-  PRESETS,
-  FORMATS,
-  CATEGORIES,
-  STYLES,
-  BACKGROUNDS,
-  SEALS,
-  type GenerationInput,
+  buildPrompt, FORMATS, PRESETS, type GenerationInput,
 } from "@/lib/promptEngine";
 import { addToLibrary } from "@/lib/generationStore";
 
-const DEFAULT_INPUT: GenerationInput = {
-  productName: "",
-  brand: "",
-  category: "outros",
-  price: "",
-  previousPrice: "",
-  discount: "",
-  quantity: "",
-  promoText: "",
-  seal: "",
-  format: "1:1",
-  style: "promocional-popular",
-  background: "estudio-clean",
-  primaryColors: "",
-  secondaryColors: "",
-  intensity: "alta",
-  headline: "",
-  secondaryText: "",
-  cta: "",
-  extraInfo: "",
-  textRules: "espaco-preco",
-  applyLogo: true,
-  applySeal: false,
-  applyPromoBand: false,
-  applyUrgency: false,
-};
+// ────────────────────────────────────────────────────────────
+// "Base" simulada de produtos (RAG mock). Em produção isto virá do Supabase.
+const MOCK_PRODUCTS = [
+  { id: "p1", name: "Arroz Tio João 5kg", category: "arroz" },
+  { id: "p2", name: "Feijão Carioca Camil 1kg", category: "feijao" },
+  { id: "p3", name: "Óleo de Soja Soya 900ml", category: "oleo" },
+  { id: "p4", name: "Café 3 Corações 500g", category: "cafe" },
+  { id: "p5", name: "Refrigerante Coca-Cola 2L", category: "refrigerantes" },
+  { id: "p6", name: "Cerveja Brahma Lata 350ml", category: "cervejas" },
+  { id: "p7", name: "Açúcar União 5kg", category: "acucar" },
+  { id: "p8", name: "Macarrão Renata 500g", category: "macarrao" },
+  { id: "p9", name: "Detergente Ypê 500ml", category: "detergente" },
+  { id: "p10", name: "Papel Higiênico Neve 12 rolos", category: "papel-higienico" },
+];
+
+type ProductPick =
+  | { kind: "catalog"; id: string; name: string; category: string }
+  | { kind: "upload"; name: string; previewUrl: string; base64: string };
+
+// Cards visuais de estilo (mapeiam para o `style` do prompt engine)
+const STYLE_CARDS = [
+  { id: "promocional-popular", icon: "🔥", title: "Oferta Popular", desc: "Forte e chamativo" },
+  { id: "premium-varejo", icon: "✨", title: "Premium Clean", desc: "Elegante e moderno" },
+  { id: "atacarejo-forte", icon: "📦", title: "Atacarejo", desc: "Volume e economia" },
+  { id: "bebidas-geladas", icon: "🧊", title: "Bebidas Geladas", desc: "Frio e refrescante" },
+  { id: "acougue-realista", icon: "🥩", title: "Açougue", desc: "Fresco e profissional" },
+  { id: "clean-moderno", icon: "🛍️", title: "Clean Moderno", desc: "Organizado e limpo" },
+] as const;
+
+// Mensagens rotativas do loading (4s cada)
+const LOADING_MESSAGES = [
+  "Analisando seu produto...",
+  "A Inteligência Artificial está desenhando o cenário...",
+  "Aplicando os preços e cores da sua marca...",
+  "Quase pronto...",
+];
 
 export default function NewGeneration() {
   const [searchParams] = useSearchParams();
-  const [input, setInput] = useState<GenerationInput>(DEFAULT_INPUT);
-  const [simpleMode, setSimpleMode] = useState(false);
-  const [simplePrompt, setSimplePrompt] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [finalPrompt, setFinalPrompt] = useState<string>("");
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
-  const [backgroundImagePreview, setBackgroundImagePreview] = useState<string | null>(null);
-  const productInputRef = useRef<HTMLInputElement>(null);
-  const backgroundInputRef = useRef<HTMLInputElement>(null);
 
+  // Wizard
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  // Etapa 1
+  const [search, setSearch] = useState("");
+  const [pick, setPick] = useState<ProductPick | null>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
+
+  // Etapa 2
+  const [currentPrice, setCurrentPrice] = useState("");
+  const [previousPrice, setPreviousPrice] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [discountSeal, setDiscountSeal] = useState("");
+  const [headline, setHeadline] = useState("");
+
+  // Etapa 3
+  const [styleId, setStyleId] = useState<string>("promocional-popular");
+
+  // Loading + Resultado
+  const [loading, setLoading] = useState(false);
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+  const [result, setResult] = useState<string | null>(null);
+
+  // Aplica preset via URL (mantém compatibilidade com /presets)
   useEffect(() => {
     const presetId = searchParams.get("preset");
     if (presetId) {
       const preset = PRESETS.find((p) => p.id === presetId);
-      if (preset) {
-        setInput((prev) => ({ ...prev, ...preset.defaults }));
-        toast.success(`Preset "${preset.name}" aplicado`);
+      if (preset?.defaults.style) {
+        setStyleId(preset.defaults.style);
+        toast.success(`Estilo "${preset.name}" pré-selecionado`);
       }
     }
   }, [searchParams]);
 
-  const update = (key: keyof GenerationInput, value: any) => {
-    setInput((prev) => ({ ...prev, [key]: value }));
-  };
+  // Cicla mensagens de loading a cada 4s
+  useEffect(() => {
+    if (!loading) return;
+    setLoadingMsgIdx(0);
+    const interval = setInterval(() => {
+      setLoadingMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [loading]);
 
-  const handleImageUpload = (file: File, type: "product" | "background") => {
+  // Filtro de busca (RAG mock)
+  const matches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return MOCK_PRODUCTS.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 6);
+  }, [search]);
+
+  // Upload de imagem do produto
+  const handleUpload = (file: File) => {
     if (file.size > 4 * 1024 * 1024) {
-      toast.error("Imagem muito grande. Máximo 4MB.");
+      toast.error("A foto está muito grande. Máximo 4MB.");
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
       const base64 = reader.result as string;
-      if (type === "product") {
-        setProductImagePreview(base64);
-        update("productImageBase64", base64);
-      } else {
-        setBackgroundImagePreview(base64);
-        update("backgroundImageBase64", base64);
-      }
+      setPick({
+        kind: "upload",
+        name: file.name.replace(/\.[^.]+$/, ""),
+        previewUrl: base64,
+        base64,
+      });
+      toast.success("Foto enviada!");
     };
     reader.readAsDataURL(file);
   };
 
-  const removeImage = (type: "product" | "background") => {
-    if (type === "product") {
-      setProductImagePreview(null);
-      update("productImageBase64", undefined);
-      if (productInputRef.current) productInputRef.current.value = "";
-    } else {
-      setBackgroundImagePreview(null);
-      update("backgroundImageBase64", undefined);
-      if (backgroundInputRef.current) backgroundInputRef.current.value = "";
-    }
-  };
+  // Avança/volta
+  const canAdvanceFrom1 = !!pick;
+  const canAdvanceFrom2 = currentPrice.trim().length > 0;
 
-  /** Validate for contradictions before generating */
-  const validate = (): string | null => {
-    if (!simpleMode && !input.productName.trim()) {
-      return "Informe o nome do produto";
-    }
-    if (simpleMode && !simplePrompt.trim()) {
-      return "Descreva o que deseja gerar";
-    }
-    // Warn if "sem-texto" is selected but text fields are filled
-    if (input.textRules === "sem-texto") {
-      const hasText = !!(input.price?.trim() || input.previousPrice?.trim() || input.headline?.trim() || input.cta?.trim() || input.discount?.trim());
-      if (hasText && !simpleMode) {
-        // Not a hard block — we'll render only the explicit text. Just inform the user.
-        toast.info("Modo 'sem texto' selecionado, mas há campos de texto preenchidos. Apenas o texto explícito será incluído.", { duration: 5000 });
-      }
-    }
-    return null;
+  const goNext = () => {
+    if (step === 1 && !canAdvanceFrom1) return toast.error("Escolha um produto ou envie uma foto.");
+    if (step === 2 && !canAdvanceFrom2) return toast.error("Informe o Preço Atual.");
+    setStep((s) => (Math.min(3, s + 1) as 1 | 2 | 3));
   };
+  const goBack = () => setStep((s) => (Math.max(1, s - 1) as 1 | 2 | 3));
 
+  // Geração final
   const handleGenerate = async () => {
-    const error = validate();
-    if (error) {
-      toast.error(error);
-      return;
-    }
+    if (!pick) return;
 
     setLoading(true);
-    setGeneratedImage(null);
+    setResult(null);
 
-    const prompt = simpleMode ? buildSimplePrompt(simplePrompt, input.format) : buildPrompt(input);
-    setFinalPrompt(prompt);
+    // Constrói payload para o promptEngine existente
+    const input: GenerationInput = {
+      productName: pick.name,
+      brand: "",
+      category: pick.kind === "catalog" ? pick.category : "outros",
+      price: currentPrice,
+      previousPrice,
+      discount: discountSeal,
+      quantity,
+      promoText: "",
+      seal: discountSeal,
+      format: "1:1",
+      style: styleId,
+      background: styleId === "bebidas-geladas" ? "freezer" : "estudio-clean",
+      primaryColors: "",
+      secondaryColors: "",
+      intensity: styleId === "premium-varejo" ? "media" : "alta",
+      headline,
+      secondaryText: "",
+      cta: "",
+      extraInfo: "",
+      textRules: "espaco-preco",
+      applyLogo: true,
+      applySeal: !!discountSeal,
+      applyPromoBand: styleId === "promocional-popular" || styleId === "atacarejo-forte",
+      applyUrgency: styleId === "promocional-popular",
+      productImageBase64: pick.kind === "upload" ? pick.base64 : undefined,
+    };
 
-    const formatData = FORMATS.find((f) => f.value === input.format) || FORMATS[0];
+    const prompt = buildPrompt(input);
+    const fmt = FORMATS[0];
 
     try {
-      const body: any = { prompt, width: formatData.width, height: formatData.height };
+      const body: any = { prompt, width: fmt.width, height: fmt.height };
       if (input.productImageBase64) body.productImage = input.productImageBase64;
-      if (input.backgroundImageBase64) body.backgroundImage = input.backgroundImageBase64;
 
-      // Auto-attach logo when applyLogo is enabled
-      if (input.applyLogo) {
-        try {
-          const logoResp = await fetch("/logo-comercial-sousa.png");
-          const logoBlob = await logoResp.blob();
-          const logoBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(logoBlob);
-          });
-          body.logoImage = logoBase64;
-        } catch (e) {
-          console.warn("Could not load logo for generation:", e);
-        }
-      }
+      // Logo automática
+      try {
+        const logoResp = await fetch("/logo-comercial-sousa.png");
+        const logoBlob = await logoResp.blob();
+        body.logoImage = await new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result as string);
+          r.readAsDataURL(logoBlob);
+        });
+      } catch {/* logo opcional */}
 
-      const { data, error } = await supabase.functions.invoke("generate-image", {
-        body,
-      });
-
+      const { data, error } = await supabase.functions.invoke("generate-image", { body });
       if (error) {
-        const context = (error as any)?.context;
-        if (context?.status === 402) {
-          const body = await context.json?.() ?? {};
-          throw new Error(body.error || "Créditos insuficientes. Adicione créditos em Settings → Workspace → Usage.");
-        }
-        if (context?.status === 429) {
-          const body = await context.json?.() ?? {};
-          throw new Error(body.error || "Muitas requisições. Aguarde um momento e tente novamente.");
-        }
+        const ctx = (error as any)?.context;
+        if (ctx?.status === 402) throw new Error("Créditos insuficientes para gerar a arte.");
+        if (ctx?.status === 429) throw new Error("Muitas tentativas. Aguarde alguns segundos.");
         throw error;
       }
       if (data?.error) throw new Error(data.error);
-      if (!data?.imageUrl) throw new Error("Nenhuma imagem retornada");
+      if (!data?.imageUrl) throw new Error("A IA não retornou uma imagem.");
 
-      setGeneratedImage(data.imageUrl);
+      setResult(data.imageUrl);
       try {
         addToLibrary({
           imageUrl: data.imageUrl,
           prompt,
-          productName: simpleMode ? simplePrompt : input.productName,
+          productName: pick.name,
           category: input.category,
-          style: input.style,
-          format: input.format,
+          style: styleId,
+          format: "1:1",
         });
-      } catch {
-        // Storage full — image still shown to user
-      }
-      toast.success("Arte gerada com sucesso!");
+      } catch {/* storage cheio */}
+      toast.success("Encarte gerado com sucesso!");
     } catch (err: any) {
-      console.error("Generation error:", err);
-      const msg = err.message || "Erro ao gerar imagem";
-      if (msg.includes("Créditos") || msg.includes("créditos")) {
-        toast.error("💳 " + msg, { duration: 8000 });
-      } else if (msg.includes("429") || msg.includes("requisições")) {
-        toast.error("⏳ " + msg, { duration: 5000 });
-      } else {
-        toast.error(msg);
-      }
+      console.error(err);
+      toast.error(err.message || "Não foi possível gerar o encarte.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDownload = () => {
-    if (!generatedImage) return;
+    if (!result) return;
     const a = document.createElement("a");
-    a.href = generatedImage;
-    a.download = `sousa-creative-${Date.now()}.png`;
+    a.href = result;
+    a.download = `encarte-${Date.now()}.png`;
     a.click();
   };
 
-  const handleCopyPrompt = () => {
-    navigator.clipboard.writeText(finalPrompt);
-    toast.success("Prompt copiado!");
+  const startOver = () => {
+    setResult(null);
+    setStep(1);
+    setSearch("");
+    setPick(null);
+    setCurrentPrice("");
+    setPreviousPrice("");
+    setQuantity("");
+    setHeadline("");
+    setDiscountSeal("");
   };
 
-  const handleRefine = async (refinement: string) => {
-    if (!generatedImage) return;
-    setLoading(true);
-    const newPrompt = finalPrompt + `\n\nAdditional refinement: ${refinement}`;
-    setFinalPrompt(newPrompt);
-
-    try {
-      const formatData = FORMATS.find((f) => f.value === input.format) || FORMATS[0];
-      const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: { prompt: newPrompt, width: formatData.width, height: formatData.height },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (!data?.imageUrl) throw new Error("Nenhuma imagem retornada");
-
-      setGeneratedImage(data.imageUrl);
-      try {
-        addToLibrary({
-          imageUrl: data.imageUrl,
-          prompt: newPrompt,
-          productName: simpleMode ? simplePrompt : input.productName,
-          category: input.category,
-          style: input.style,
-          format: input.format,
-        });
-      } catch {
-        // Storage full
-      }
-      toast.success("Arte refinada!");
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao refinar");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <div className="mb-6 animate-fade-up">
-        <h1 className="text-2xl font-bold tracking-tight">Nova Arte</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Preencha os dados e gere sua arte promocional
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Form */}
-        <div className="space-y-6 animate-fade-up" style={{ animationDelay: "80ms" }}>
-          {/* Mode toggle */}
-          <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
-            <Switch checked={simpleMode} onCheckedChange={setSimpleMode} />
-            <span className="text-sm font-medium">
-              {simpleMode ? "Modo Simples" : "Modo Detalhado"}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {simpleMode ? "Descreva com suas palavras" : "Formulário completo"}
-            </span>
+  // ────────── LOADING OVERLAY ──────────
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-md border border-slate-200 px-8 py-12 max-w-md w-full text-center animate-scale-in">
+          <div className="relative h-20 w-20 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full border-4 border-orange-100" />
+            <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin" />
+            <Sparkles className="absolute inset-0 m-auto h-8 w-8 text-orange-500" />
           </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Gerando seu encarte</h2>
+          <p key={loadingMsgIdx} className="text-base text-slate-600 animate-fade-up min-h-[24px]">
+            {LOADING_MESSAGES[loadingMsgIdx]}
+          </p>
+          <p className="text-xs text-slate-400 mt-6">
+            Isso costuma levar de 15 a 20 segundos.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-          {simpleMode ? (
-            <div className="space-y-3">
-              <Label>Descreva o que deseja gerar</Label>
-              <Textarea
-                value={simplePrompt}
-                onChange={(e) => setSimplePrompt(e.target.value)}
-                placeholder="Ex: arroz 5kg promoção, refrigerante 2L oferta do dia, combo limpeza..."
-                rows={4}
-                className="resize-none"
-              />
-              <p className="text-xs text-muted-foreground">
-                A IA vai expandir automaticamente em um prompt profissional
-              </p>
+  // ────────── RESULTADO ──────────
+  if (result) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-6 lg:p-8">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6 animate-scale-in">
+            <div className="flex items-center gap-2 text-emerald-600 mb-4">
+              <Check className="h-5 w-5" />
+              <span className="font-semibold">Encarte pronto!</span>
             </div>
-          ) : (
-            <>
-              {/* Product Data */}
-              <fieldset className="space-y-4 rounded-xl border border-border bg-card p-5">
-                <legend className="text-sm font-semibold px-2">Dados do Produto</legend>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <Label>Nome do Produto *</Label>
-                    <Input value={input.productName} onChange={(e) => update("productName", e.target.value)} placeholder="Ex: Arroz Tio João 5kg" />
-                  </div>
-                  <div>
-                    <Label>Marca</Label>
-                    <Input value={input.brand} onChange={(e) => update("brand", e.target.value)} placeholder="Ex: Tio João" />
-                  </div>
-                  <div>
-                    <Label>Categoria</Label>
-                    <Select value={input.category} onValueChange={(v) => update("category", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map((c) => (
-                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Preço</Label>
-                    <Input value={input.price} onChange={(e) => update("price", e.target.value)} placeholder="R$ 19,90" />
-                  </div>
-                  <div>
-                    <Label>Preço anterior</Label>
-                    <Input value={input.previousPrice} onChange={(e) => update("previousPrice", e.target.value)} placeholder="R$ 24,90" />
-                  </div>
-                  <div>
-                    <Label>Desconto</Label>
-                    <Input value={input.discount} onChange={(e) => update("discount", e.target.value)} placeholder="20% OFF" />
-                  </div>
-                  <div>
-                    <Label>Quantidade/Volume</Label>
-                    <Input value={input.quantity} onChange={(e) => update("quantity", e.target.value)} placeholder="5kg, 2L, 500ml" />
-                  </div>
-                  <div>
-                    <Label>Selo</Label>
-                    <Select value={input.seal || "nenhum"} onValueChange={(v) => update("seal", v === "nenhum" ? "" : v)}>
-                      <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="nenhum">Nenhum</SelectItem>
-                        {SEALS.map((s) => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Label>Texto Promocional</Label>
-                    <Input value={input.promoText} onChange={(e) => update("promoText", e.target.value)} placeholder="Ex: Válido até sábado!" />
-                  </div>
-
-                  {/* Image uploads */}
-                  <div className="col-span-2 grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="mb-2 block">Foto do Produto</Label>
-                      <input
-                        ref={productInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleImageUpload(file, "product");
-                        }}
-                      />
-                      {productImagePreview ? (
-                        <div className="relative group rounded-lg overflow-hidden border border-border aspect-square">
-                          <img src={productImagePreview} alt="Produto" className="w-full h-full object-cover" />
-                          <button
-                            onClick={() => removeImage("product")}
-                            className="absolute top-1.5 right-1.5 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => productInputRef.current?.click()}
-                          className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 transition-colors"
-                        >
-                          <ImagePlus className="h-6 w-6 text-muted-foreground mb-1" />
-                          <span className="text-xs text-muted-foreground">Adicionar foto</span>
-                        </button>
-                      )}
-                    </div>
-                    <div>
-                      <Label className="mb-2 block">Foto de Fundo</Label>
-                      <input
-                        ref={backgroundInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleImageUpload(file, "background");
-                        }}
-                      />
-                      {backgroundImagePreview ? (
-                        <div className="relative group rounded-lg overflow-hidden border border-border aspect-square">
-                          <img src={backgroundImagePreview} alt="Fundo" className="w-full h-full object-cover" />
-                          <button
-                            onClick={() => removeImage("background")}
-                            className="absolute top-1.5 right-1.5 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => backgroundInputRef.current?.click()}
-                          className="flex flex-col items-center justify-center w-full aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 transition-colors"
-                        >
-                          <ImagePlus className="h-6 w-6 text-muted-foreground mb-1" />
-                          <span className="text-xs text-muted-foreground">Adicionar fundo</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </fieldset>
-
-              {/* Visual Data */}
-              <fieldset className="space-y-4 rounded-xl border border-border bg-card p-5">
-                <legend className="text-sm font-semibold px-2">Configuração Visual</legend>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Formato</Label>
-                    <Select value={input.format} onValueChange={(v) => update("format", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {FORMATS.map((f) => (
-                          <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Estilo</Label>
-                    <Select value={input.style} onValueChange={(v) => update("style", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {STYLES.map((s) => (
-                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Fundo</Label>
-                    <Select value={input.background} onValueChange={(v) => update("background", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {BACKGROUNDS.map((b) => (
-                          <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Intensidade Promocional</Label>
-                    <Select value={input.intensity} onValueChange={(v) => update("intensity", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="baixa">Baixa</SelectItem>
-                        <SelectItem value="media">Média</SelectItem>
-                        <SelectItem value="alta">Alta</SelectItem>
-                        <SelectItem value="maxima">Máxima</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Texto na imagem</Label>
-                    <Select value={input.textRules} onValueChange={(v) => update("textRules", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pouco-texto">Pouco texto</SelectItem>
-                        <SelectItem value="moderado">Moderado</SelectItem>
-                        <SelectItem value="espaco-preco">Espaço para preço</SelectItem>
-                        <SelectItem value="sem-texto">Sem texto</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Cores principais</Label>
-                    <Input value={input.primaryColors} onChange={(e) => update("primaryColors", e.target.value)} placeholder="vermelho, amarelo" />
-                  </div>
-                </div>
-              </fieldset>
-
-              {/* Advanced */}
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+              <img src={result} alt="Encarte gerado" className="w-full h-auto" />
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-5">
+              <Button variant="outline" size="lg" onClick={startOver} className="h-12">
+                <RefreshCw className="h-4 w-4 mr-2" /> Criar outro
+              </Button>
+              <Button
+                size="lg"
+                onClick={handleDownload}
+                className="h-12 bg-orange-500 hover:bg-orange-600 text-white"
               >
-                {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                Opções avançadas
-              </button>
+                <Download className="h-4 w-4 mr-2" /> Baixar imagem
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-              {showAdvanced && (
-                <fieldset className="space-y-4 rounded-xl border border-border bg-card p-5 animate-scale-in">
-                  <legend className="text-sm font-semibold px-2">Branding & Extras</legend>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Faixa promocional</Label>
-                      <Switch checked={input.applyPromoBand} onCheckedChange={(v) => update("applyPromoBand", v)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label>Elementos de urgência</Label>
-                      <Switch checked={input.applyUrgency} onCheckedChange={(v) => update("applyUrgency", v)} />
-                    </div>
-                    <div>
-                      <Label>Headline</Label>
-                      <Input value={input.headline} onChange={(e) => update("headline", e.target.value)} placeholder="Ex: OFERTA IMPERDÍVEL" />
-                    </div>
-                    <div>
-                      <Label>Texto secundário</Label>
-                      <Input value={input.secondaryText} onChange={(e) => update("secondaryText", e.target.value)} placeholder="Ex: Só esta semana!" />
-                    </div>
-                    <div>
-                      <Label>CTA</Label>
-                      <Input value={input.cta} onChange={(e) => update("cta", e.target.value)} placeholder="Ex: Compre já!" />
-                    </div>
-                    <div>
-                      <Label>Cores secundárias</Label>
-                      <Input value={input.secondaryColors} onChange={(e) => update("secondaryColors", e.target.value)} placeholder="Ex: branco, preto" />
-                    </div>
-                    <div>
-                      <Label>Observações extras</Label>
-                      <Textarea value={input.extraInfo} onChange={(e) => update("extraInfo", e.target.value)} rows={2} placeholder="Instruções adicionais..." className="resize-none" />
-                    </div>
-                  </div>
-                </fieldset>
-              )}
-            </>
+  // ────────── WIZARD ──────────
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+        {/* Header */}
+        <header className="mb-6 animate-fade-up">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Criar Novo Encarte
+          </h1>
+          <p className="text-base text-slate-600 mt-2">
+            Vamos montar sua arte em 3 passos simples.
+          </p>
+        </header>
+
+        {/* Stepper */}
+        <Stepper step={step} />
+
+        {/* Card principal */}
+        <div
+          key={step}
+          className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:p-8 animate-fade-up"
+        >
+          {step === 1 && (
+            <Step1
+              search={search}
+              setSearch={setSearch}
+              matches={matches}
+              pick={pick}
+              setPick={setPick}
+              uploadRef={uploadRef}
+              onUpload={handleUpload}
+            />
           )}
 
-          {/* Generate Button */}
-          <Button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="w-full h-12 text-base font-bold promo-gradient border-0 text-primary-foreground hover:opacity-90 transition-opacity active:scale-[0.98]"
-            size="lg"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Gerando arte...
-              </>
+          {step === 2 && pick && (
+            <Step2
+              pick={pick}
+              currentPrice={currentPrice}
+              setCurrentPrice={setCurrentPrice}
+              previousPrice={previousPrice}
+              setPreviousPrice={setPreviousPrice}
+              quantity={quantity}
+              setQuantity={setQuantity}
+              showAdvanced={showAdvanced}
+              setShowAdvanced={setShowAdvanced}
+              discountSeal={discountSeal}
+              setDiscountSeal={setDiscountSeal}
+              headline={headline}
+              setHeadline={setHeadline}
+            />
+          )}
+
+          {step === 3 && (
+            <Step3 styleId={styleId} setStyleId={setStyleId} />
+          )}
+
+          {/* Navegação */}
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
+            <Button
+              variant="ghost"
+              onClick={goBack}
+              disabled={step === 1}
+              className="text-slate-600"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" /> Voltar
+            </Button>
+
+            {step < 3 ? (
+              <Button
+                onClick={goNext}
+                size="lg"
+                className="h-12 px-6 bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                Continuar <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
             ) : (
-              <>
-                <Sparkles className="h-5 w-5 mr-2" />
-                Gerar Arte Promocional
-              </>
+              <Button
+                onClick={handleGenerate}
+                size="lg"
+                className="h-12 px-6 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold shadow-md"
+              >
+                <Sparkles className="h-5 w-5 mr-2" /> Gerar Encarte com IA
+              </Button>
             )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Stepper
+// ──────────────────────────────────────────────────────────────
+function Stepper({ step }: { step: 1 | 2 | 3 }) {
+  const steps = [
+    { n: 1, label: "Produto" },
+    { n: 2, label: "Preço" },
+    { n: 3, label: "Estilo" },
+  ];
+  return (
+    <div className="flex items-center gap-2 mb-6 animate-fade-up" style={{ animationDelay: "60ms" }}>
+      {steps.map((s, i) => {
+        const isDone = step > s.n;
+        const isActive = step === s.n;
+        return (
+          <div key={s.n} className="flex items-center flex-1">
+            <div className="flex items-center gap-2">
+              <div
+                className={[
+                  "h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold transition",
+                  isDone ? "bg-emerald-500 text-white" :
+                  isActive ? "bg-orange-500 text-white" : "bg-slate-200 text-slate-500",
+                ].join(" ")}
+              >
+                {isDone ? <Check className="h-4 w-4" /> : s.n}
+              </div>
+              <span className={["text-sm font-medium hidden sm:inline", isActive ? "text-slate-900" : "text-slate-500"].join(" ")}>
+                {s.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={["flex-1 h-0.5 mx-3 rounded-full", step > s.n ? "bg-emerald-500" : "bg-slate-200"].join(" ")} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// ETAPA 1 – Produto
+// ──────────────────────────────────────────────────────────────
+function Step1({
+  search, setSearch, matches, pick, setPick, uploadRef, onUpload,
+}: {
+  search: string; setSearch: (v: string) => void;
+  matches: typeof MOCK_PRODUCTS;
+  pick: ProductPick | null;
+  setPick: (p: ProductPick | null) => void;
+  uploadRef: React.RefObject<HTMLInputElement>;
+  onUpload: (f: File) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900">Qual produto você quer anunciar?</h2>
+        <p className="text-sm text-slate-500 mt-1">Busque no nosso catálogo ou envie uma foto.</p>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Ex: arroz, refrigerante, café..."
+          className="h-14 pl-12 text-base rounded-xl border-slate-200 focus-visible:ring-orange-400"
+        />
+      </div>
+
+      {/* Resultados */}
+      {search && (
+        <div className="space-y-2">
+          {matches.length === 0 ? (
+            <p className="text-sm text-slate-500 px-2">Nenhum produto encontrado no catálogo.</p>
+          ) : (
+            matches.map((p) => {
+              const selected = pick?.kind === "catalog" && pick.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setPick({ kind: "catalog", id: p.id, name: p.name, category: p.category })}
+                  className={[
+                    "w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition",
+                    selected
+                      ? "border-orange-500 bg-orange-50"
+                      : "border-slate-200 hover:border-orange-300 bg-white",
+                  ].join(" ")}
+                >
+                  <div className="h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
+                    <ImageIcon className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-slate-900">{p.name}</div>
+                    <div className="text-xs text-slate-500 capitalize">{p.category}</div>
+                  </div>
+                  {selected && <Check className="h-5 w-5 text-orange-500" />}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Card de fallback — sempre visível em destaque */}
+      <div className="rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/50 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+            <Upload className="h-5 w-5 text-orange-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-slate-900">Não encontrou o produto na lista?</p>
+            <p className="text-sm text-slate-600">Envie uma foto que você mesmo tirou.</p>
+          </div>
+          <input
+            ref={uploadRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onUpload(f);
+            }}
+          />
+          <Button
+            onClick={() => uploadRef.current?.click()}
+            variant="outline"
+            className="border-orange-300 text-orange-700 hover:bg-orange-100 hover:text-orange-800"
+          >
+            <Upload className="h-4 w-4 mr-2" /> Enviar foto do meu produto
           </Button>
         </div>
 
-        {/* Result Panel */}
-        <div className="animate-fade-up" style={{ animationDelay: "160ms" }}>
-          {generatedImage ? (
-            <div className="space-y-4">
-              <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
-                <img
-                  src={generatedImage}
-                  alt="Arte gerada"
-                  className="w-full"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={handleDownload} variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-1.5" /> Baixar
-                </Button>
-                <Button onClick={handleGenerate} variant="outline" size="sm" disabled={loading}>
-                  <RefreshCw className="h-4 w-4 mr-1.5" /> Nova Variação
-                </Button>
-                <Button onClick={handleCopyPrompt} variant="outline" size="sm">
-                  <Copy className="h-4 w-4 mr-1.5" /> Copiar Prompt
-                </Button>
-              </div>
-
-              {/* Refinements */}
-              <div className="space-y-2">
-                <p className="text-sm font-semibold">Refinamentos Rápidos</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    "Make it more premium and polished",
-                    "Make it more popular and eye-catching",
-                    "Increase promotional urgency feel",
-                    "Highlight the product more, larger and centered",
-                    "Improve product lighting and realism",
-                    "Make the background cleaner",
-                    "Adapt for vertical Stories format 9:16",
-                    "Adapt for square post format 1:1",
-                  ].map((ref, i) => {
-                    const labels = [
-                      "Mais premium", "Mais popular", "Mais promoção",
-                      "Destacar produto", "Melhorar luz", "Fundo mais limpo",
-                      "Adaptar Stories", "Adaptar quadrado",
-                    ];
-                    return (
-                      <Button
-                        key={i}
-                        variant="secondary"
-                        size="sm"
-                        className="text-xs"
-                        disabled={loading}
-                        onClick={() => handleRefine(ref)}
-                      >
-                        {labels[i]}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Prompt */}
-              <button
-                onClick={() => setShowPrompt(!showPrompt)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showPrompt ? "Ocultar prompt" : "Ver prompt utilizado"}
-              </button>
-              {showPrompt && (
-                <div className="rounded-lg bg-muted p-3 text-xs font-mono leading-relaxed break-words whitespace-pre-wrap animate-scale-in">
-                  {finalPrompt}
-                </div>
-              )}
+        {pick?.kind === "upload" && (
+          <div className="mt-4 flex items-center gap-3 p-3 bg-white rounded-lg border border-orange-200">
+            <img src={pick.previewUrl} alt={pick.name} className="h-14 w-14 rounded-lg object-cover" />
+            <div className="flex-1 text-sm">
+              <div className="font-medium text-slate-900">{pick.name}</div>
+              <div className="text-xs text-emerald-600">Foto carregada</div>
             </div>
+            <button
+              onClick={() => setPick(null)}
+              className="text-slate-400 hover:text-slate-700 p-1"
+              aria-label="Remover"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// ETAPA 2 – Preço
+// ──────────────────────────────────────────────────────────────
+function Step2({
+  pick, currentPrice, setCurrentPrice, previousPrice, setPreviousPrice,
+  quantity, setQuantity, showAdvanced, setShowAdvanced,
+  discountSeal, setDiscountSeal, headline, setHeadline,
+}: {
+  pick: ProductPick;
+  currentPrice: string; setCurrentPrice: (v: string) => void;
+  previousPrice: string; setPreviousPrice: (v: string) => void;
+  quantity: string; setQuantity: (v: string) => void;
+  showAdvanced: boolean; setShowAdvanced: (v: boolean) => void;
+  discountSeal: string; setDiscountSeal: (v: string) => void;
+  headline: string; setHeadline: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900">Detalhes da oferta</h2>
+        <p className="text-sm text-slate-500 mt-1">Informe o preço e detalhes da promoção.</p>
+      </div>
+
+      {/* Produto selecionado */}
+      <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+        <div className="h-16 w-16 rounded-lg bg-white border border-slate-200 flex items-center justify-center overflow-hidden">
+          {pick.kind === "upload" ? (
+            <img src={pick.previewUrl} alt={pick.name} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-border bg-card/50 aspect-square">
-              <div className="text-center p-8">
-                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-                <p className="text-sm text-muted-foreground">
-                  {loading ? "Gerando sua arte promocional..." : "Preencha os dados e clique em gerar"}
-                </p>
-                {loading && <Loader2 className="h-6 w-6 mx-auto mt-4 animate-spin text-primary" />}
-              </div>
-            </div>
+            <ImageIcon className="h-6 w-6 text-slate-400" />
           )}
         </div>
+        <div className="flex-1">
+          <div className="text-xs text-slate-500 uppercase tracking-wide">Produto escolhido</div>
+          <div className="font-semibold text-slate-900">{pick.name}</div>
+        </div>
+      </div>
+
+      {/* Preços */}
+      <div className="space-y-4">
+        <div>
+          <Label className="text-sm font-medium text-slate-700">
+            Preço Atual <span className="text-orange-500">*</span>
+          </Label>
+          <Input
+            value={currentPrice}
+            onChange={(e) => setCurrentPrice(e.target.value)}
+            placeholder="Ex: R$ 19,90"
+            className="mt-1.5 h-12 text-lg font-semibold"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-sm font-medium text-slate-700">Preço Antigo (Opcional)</Label>
+            <Input
+              value={previousPrice}
+              onChange={(e) => setPreviousPrice(e.target.value)}
+              placeholder="Ex: R$ 24,90"
+              className="mt-1.5 h-11"
+            />
+          </div>
+          <div>
+            <Label className="text-sm font-medium text-slate-700">Quantidade / Volume</Label>
+            <Input
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="Ex: 5kg, 2L, 500ml"
+              className="mt-1.5 h-11"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Opções avançadas */}
+      <div className="border-t border-slate-100 pt-4">
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center gap-2 text-sm font-medium text-orange-600 hover:text-orange-700"
+        >
+          {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          Opções Avançadas
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-4 space-y-4 animate-fade-up">
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Selo de Desconto</Label>
+              <Input
+                value={discountSeal}
+                onChange={(e) => setDiscountSeal(e.target.value)}
+                placeholder="Ex: 20% OFF, OFERTA, IMPERDÍVEL"
+                className="mt-1.5 h-11"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Título Principal da Oferta</Label>
+              <Input
+                value={headline}
+                onChange={(e) => setHeadline(e.target.value)}
+                placeholder="Ex: Mega Promoção da Semana"
+                className="mt-1.5 h-11"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// ETAPA 3 – Estilo Visual
+// ──────────────────────────────────────────────────────────────
+function Step3({ styleId, setStyleId }: { styleId: string; setStyleId: (v: string) => void }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900">Escolha o Estilo do Encarte</h2>
+        <p className="text-sm text-slate-500 mt-1">Toque no visual que combina mais com a sua oferta.</p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {STYLE_CARDS.map((card) => {
+          const selected = styleId === card.id;
+          return (
+            <button
+              key={card.id}
+              onClick={() => setStyleId(card.id)}
+              className={[
+                "relative rounded-2xl border-2 p-5 text-left transition-all",
+                selected
+                  ? "border-orange-500 bg-orange-50 shadow-md scale-[1.02]"
+                  : "border-slate-200 bg-white hover:border-orange-300 hover:shadow-sm",
+              ].join(" ")}
+            >
+              <div className="text-3xl mb-2">{card.icon}</div>
+              <div className="font-semibold text-slate-900 text-sm">{card.title}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{card.desc}</div>
+              {selected && (
+                <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-orange-500 text-white flex items-center justify-center">
+                  <Check className="h-3.5 w-3.5" />
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
