@@ -75,12 +75,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="border-t border-sidebar-border p-4">
-          <div className="rounded-lg bg-sidebar-accent p-3">
+          <div className="rounded-lg bg-sidebar-accent p-3 flex items-center gap-2">
+            <span className="text-xs">✨</span>
             <p className="text-xs font-medium text-sidebar-accent-foreground/80">
-              Comercial Sousa
-            </p>
-            <p className="text-[11px] text-sidebar-foreground/50 mt-0.5">
-              Motor: Nano Banana 2
+              IA Ativada
             </p>
           </div>
         </div>
