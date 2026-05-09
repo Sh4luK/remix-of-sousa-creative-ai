@@ -14,6 +14,8 @@ import {
   buildPrompt, FORMATS, PRESETS, type GenerationInput,
 } from "@/lib/promptEngine";
 import { addToLibrary } from "@/lib/generationStore";
+import { VoiceMagicButton } from "@/components/VoiceMagicButton";
+import { parseVoiceTranscript } from "@/lib/voiceParser";
 
 // ────────────────────────────────────────────────────────────
 // Catálogo simulado (futura consulta ao Supabase)
