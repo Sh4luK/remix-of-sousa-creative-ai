@@ -593,7 +593,7 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
 // ETAPA 1 – Produto
 // ──────────────────────────────────────────────────────────────
 function Step1({
-  search, setSearch, matches, pick, setPick, uploadRef, onUpload,
+  search, setSearch, matches, pick, setPick, uploadRef, onUpload, onVoice,
 }: {
   search: string; setSearch: (v: string) => void;
   matches: typeof MOCK_PRODUCTS;
@@ -601,6 +601,7 @@ function Step1({
   setPick: (p: ProductPick | null) => void;
   uploadRef: React.RefObject<HTMLInputElement>;
   onUpload: (f: File) => void;
+  onVoice: (transcript: string) => void;
 }) {
   return (
     <div className="space-y-5">
