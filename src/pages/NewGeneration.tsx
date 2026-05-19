@@ -211,11 +211,14 @@ export default function NewGeneration() {
 
     if (price) setCurrentPrice(`R$ ${price}`);
 
-    toast.success("Áudio compreendido! Confirmando os dados...");
-
-    if (product) {
-      setTimeout(() => setStep(2), 600);
-    }
+    const parts: string[] = [];
+    if (product) parts.push(`produto "${product}"`);
+    if (price) parts.push(`preço R$ ${price}`);
+    toast.success(
+      parts.length
+        ? `Entendi: ${parts.join(" e ")}. Revise e ajuste se precisar.`
+        : "Áudio compreendido! Revise os campos.",
+    );
   };
 
   // Avança/volta
