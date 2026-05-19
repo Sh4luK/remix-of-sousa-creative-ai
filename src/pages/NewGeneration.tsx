@@ -625,6 +625,50 @@ function Step1({
       {/* 🎤 Modo Mágico por Voz — atalho para preencher tudo falando */}
       <VoiceMagicButton onResult={onVoice} />
 
+      {/* Pré-visualização editável do que a voz capturou */}
+      {(pick?.kind === "custom" || currentPrice) && (
+        <div className="rounded-2xl border-2 border-orange-200 bg-orange-50/60 p-4 sm:p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-orange-600" />
+            <p className="text-sm font-semibold text-orange-900">
+              Confira o que entendemos. Pode editar antes de continuar.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">
+                Produto
+              </label>
+              <Input
+                value={pick?.kind === "custom" ? pick.name : pick?.name ?? ""}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  if (!pick || pick.kind === "custom") {
+                    setPick({ kind: "custom", name });
+                    setSearch(name);
+                  }
+                }}
+                readOnly={pick != null && pick.kind !== "custom"}
+                placeholder="Ex: Cerveja Heineken"
+                className="h-12 rounded-xl border-orange-200 bg-white focus-visible:ring-orange-400"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">
+                Preço
+              </label>
+              <Input
+                value={currentPrice}
+                onChange={(e) => setCurrentPrice(e.target.value)}
+                placeholder="R$ 0,00"
+                inputMode="decimal"
+                className="h-12 rounded-xl border-orange-200 bg-white focus-visible:ring-orange-400 font-semibold"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Separador "ou digite" */}
       <div className="flex items-center gap-3">
         <div className="flex-1 h-px bg-slate-200" />
