@@ -463,6 +463,8 @@ export default function NewGeneration() {
               uploadRef={uploadRef}
               onUpload={handleUpload}
               onVoice={handleVoiceTranscript}
+              currentPrice={currentPrice}
+              setCurrentPrice={setCurrentPrice}
             />
           )}
 
