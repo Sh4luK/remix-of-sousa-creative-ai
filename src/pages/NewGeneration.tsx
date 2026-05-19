@@ -476,7 +476,7 @@ export default function NewGeneration() {
             <Step2
               pick={pick}
               currentPrice={currentPrice}
-              setCurrentPrice={setCurrentPrice}
+              setCurrentPrice={(v) => { setCurrentPrice(v); if (voicePrice) setVoicePrice(null); }}
               previousPrice={previousPrice}
               setPreviousPrice={setPreviousPrice}
               quantity={quantity}
@@ -487,7 +487,18 @@ export default function NewGeneration() {
               setDiscountSeal={setDiscountSeal}
               headline={headline}
               setHeadline={setHeadline}
+              voicePrice={voicePrice}
+              onConfirmVoicePrice={() => {
+                setVoicePrice(null);
+                toast.success("Preço confirmado!");
+                setStep(3);
+              }}
+              onRejectVoicePrice={() => {
+                setVoicePrice(null);
+                setCurrentPrice("");
+              }}
             />
+
           )}
 
           {step === 3 && (
