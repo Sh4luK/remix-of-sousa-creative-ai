@@ -105,6 +105,7 @@ export default function NewGeneration() {
 
   // Etapa 2
   const [currentPrice, setCurrentPrice] = useState("");
+  const [voicePrice, setVoicePrice] = useState<string | null>(null); // preço inferido pelo áudio, aguardando confirmação
   const [previousPrice, setPreviousPrice] = useState("");
   const [quantity, setQuantity] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -209,7 +210,10 @@ export default function NewGeneration() {
       setSearch(product);
     }
 
-    if (price) setCurrentPrice(`R$ ${price}`);
+    if (price) {
+      setCurrentPrice(`R$ ${price}`);
+      setVoicePrice(`R$ ${price}`);
+    }
 
     const parts: string[] = [];
     if (product) parts.push(`produto "${product}"`);
@@ -472,7 +476,7 @@ export default function NewGeneration() {
             <Step2
               pick={pick}
               currentPrice={currentPrice}
-              setCurrentPrice={setCurrentPrice}
+              setCurrentPrice={(v) => { setCurrentPrice(v); if (voicePrice) setVoicePrice(null); }}
               previousPrice={previousPrice}
               setPreviousPrice={setPreviousPrice}
               quantity={quantity}
@@ -483,7 +487,18 @@ export default function NewGeneration() {
               setDiscountSeal={setDiscountSeal}
               headline={headline}
               setHeadline={setHeadline}
+              voicePrice={voicePrice}
+              onConfirmVoicePrice={() => {
+                setVoicePrice(null);
+                toast.success("Preço confirmado!");
+                setStep(3);
+              }}
+              onRejectVoicePrice={() => {
+                setVoicePrice(null);
+                setCurrentPrice("");
+              }}
             />
+
           )}
 
           {step === 3 && (
@@ -813,6 +828,7 @@ function Step2({
   pick, currentPrice, setCurrentPrice, previousPrice, setPreviousPrice,
   quantity, setQuantity, showAdvanced, setShowAdvanced,
   discountSeal, setDiscountSeal, headline, setHeadline,
+  voicePrice, onConfirmVoicePrice, onRejectVoicePrice,
 }: {
   pick: ProductPick;
   currentPrice: string; setCurrentPrice: (v: string) => void;
@@ -821,6 +837,9 @@ function Step2({
   showAdvanced: boolean; setShowAdvanced: (v: boolean) => void;
   discountSeal: string; setDiscountSeal: (v: string) => void;
   headline: string; setHeadline: (v: string) => void;
+  voicePrice: string | null;
+  onConfirmVoicePrice: () => void;
+  onRejectVoicePrice: () => void;
 }) {
   return (
     <div className="space-y-5">
@@ -828,6 +847,41 @@ function Step2({
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Detalhes da oferta</h2>
         <p className="text-sm text-slate-500 mt-1">Só o preço já basta. O resto é opcional.</p>
       </div>
+
+      {/* Confirmação do preço inferido pelo áudio */}
+      {voicePrice && (
+        <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-4 sm:p-5 shadow-sm animate-fade-up">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+              <span className="text-lg">🎤</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-900">
+                Entendi pelo seu áudio: <span className="text-orange-600">{voicePrice}</span>
+              </p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                O preço está certo? Confirme para avançar ou corrija no campo abaixo.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <Button
+                  onClick={onConfirmVoicePrice}
+                  className="bg-orange-500 hover:bg-orange-600 text-white h-10"
+                >
+                  <Check className="h-4 w-4 mr-1.5" /> Sim, está certo
+                </Button>
+                <Button
+                  onClick={onRejectVoicePrice}
+                  variant="outline"
+                  className="h-10 border-orange-200 text-orange-700 hover:bg-orange-100"
+                >
+                  Corrigir preço
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Produto selecionado */}
       <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
