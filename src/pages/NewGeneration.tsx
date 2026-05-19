@@ -105,6 +105,7 @@ export default function NewGeneration() {
 
   // Etapa 2
   const [currentPrice, setCurrentPrice] = useState("");
+  const [voicePrice, setVoicePrice] = useState<string | null>(null); // preço inferido pelo áudio, aguardando confirmação
   const [previousPrice, setPreviousPrice] = useState("");
   const [quantity, setQuantity] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
