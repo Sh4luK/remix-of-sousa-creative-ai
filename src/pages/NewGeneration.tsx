@@ -210,7 +210,10 @@ export default function NewGeneration() {
       setSearch(product);
     }
 
-    if (price) setCurrentPrice(`R$ ${price}`);
+    if (price) {
+      setCurrentPrice(`R$ ${price}`);
+      setVoicePrice(`R$ ${price}`);
+    }
 
     const parts: string[] = [];
     if (product) parts.push(`produto "${product}"`);
