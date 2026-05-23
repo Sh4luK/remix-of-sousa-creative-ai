@@ -41,6 +41,7 @@ export function VoiceMagicButton({ onResult }: VoiceMagicButtonProps) {
     rec.maxAlternatives = 1;
 
     let finalText = "";
+    let lastInterim = "";
 
     rec.onstart = () => {
       setRecording(true);
@@ -54,6 +55,7 @@ export function VoiceMagicButton({ onResult }: VoiceMagicButtonProps) {
         if (e.results[i].isFinal) finalText += transcript;
         else interimText += transcript;
       }
+      lastInterim = interimText;
       setInterim(interimText || finalText);
     };
 
@@ -71,7 +73,7 @@ export function VoiceMagicButton({ onResult }: VoiceMagicButtonProps) {
 
     rec.onend = () => {
       setRecording(false);
-      const text = (finalText || interim).trim();
+      const text = (finalText || lastInterim).trim();
       setInterim("");
       if (text) onResult(text);
     };

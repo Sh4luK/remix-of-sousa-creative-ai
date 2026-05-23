@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Heart, Trash2, Download, Image as ImageIcon, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,12 +6,19 @@ import { getLibrary, toggleFavorite, deleteFromLibrary, type GeneratedImage } fr
 import { toast } from "sonner";
 
 export default function Library() {
-  const [library, setLibrary] = useState(getLibrary());
+  const [library, setLibrary] = useState<GeneratedImage[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "favorites">("all");
   const [selected, setSelected] = useState<GeneratedImage | null>(null);
 
-  const refresh = () => setLibrary(getLibrary());
+  const refresh = () => getLibrary().then(setLibrary);
+
+  useEffect(() => {
+    getLibrary()
+      .then(setLibrary)
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = library.filter((img) => {
     if (filter === "favorites" && !img.favorite) return false;
@@ -19,13 +26,13 @@ export default function Library() {
     return true;
   });
 
-  const handleToggleFav = (id: string) => {
-    toggleFavorite(id);
+  const handleToggleFav = async (id: string) => {
+    await toggleFavorite(id);
     refresh();
   };
 
-  const handleDelete = (id: string) => {
-    deleteFromLibrary(id);
+  const handleDelete = async (id: string) => {
+    await deleteFromLibrary(id);
     refresh();
     if (selected?.id === id) setSelected(null);
     toast.success("Arte removida");
@@ -66,7 +73,13 @@ export default function Library() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="aspect-square rounded-xl bg-muted animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-border p-12 text-center animate-fade-up">
           <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground/30 mb-4" />
           <p className="font-medium">Nenhuma arte encontrada</p>
@@ -93,18 +106,21 @@ export default function Library() {
               </div>
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
+                  aria-label="Favoritar"
                   onClick={(e) => { e.stopPropagation(); handleToggleFav(img.id); }}
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-card/90 backdrop-blur transition-colors hover:bg-card"
                 >
                   <Heart className={`h-3.5 w-3.5 ${img.favorite ? "fill-primary text-primary" : "text-foreground"}`} />
                 </button>
                 <button
+                  aria-label="Baixar"
                   onClick={(e) => { e.stopPropagation(); handleDownload(img); }}
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-card/90 backdrop-blur transition-colors hover:bg-card"
                 >
                   <Download className="h-3.5 w-3.5" />
                 </button>
                 <button
+                  aria-label="Remover"
                   onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }}
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-card/90 backdrop-blur transition-colors hover:bg-destructive/90 hover:text-destructive-foreground"
                 >
@@ -127,7 +143,10 @@ export default function Library() {
             <div className="mt-4 space-y-2">
               <h3 className="font-bold text-lg">{selected.productName}</h3>
               <p className="text-xs text-muted-foreground">
-                {new Date(selected.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                {new Date(selected.createdAt).toLocaleDateString("pt-BR", {
+                  day: "2-digit", month: "long", year: "numeric",
+                  hour: "2-digit", minute: "2-digit",
+                })}
               </p>
               <details className="text-xs">
                 <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Ver prompt</summary>

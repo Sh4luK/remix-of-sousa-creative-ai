@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { PlusCircle, Image, Layers, Sparkles, ArrowRight, Clock, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getLibrary } from "@/lib/generationStore";
+import { getLibrary, type GeneratedImage } from "@/lib/generationStore";
 import { PRESETS } from "@/lib/promptEngine";
 
 const BUSINESS_LABELS: Record<string, string> = {
@@ -25,7 +25,12 @@ function getBusinessLabel(presetId: string): string {
 }
 
 export default function Dashboard() {
-  const library = getLibrary();
+  const [library, setLibrary] = useState<GeneratedImage[]>([]);
+
+  useEffect(() => {
+    getLibrary().then(setLibrary).catch(() => setLibrary([]));
+  }, []);
+
   const recentImages = library.slice(0, 6);
 
   return (

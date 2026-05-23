@@ -31,7 +31,7 @@ function wordsToNumber(tokens: string[]): number | null {
   let total = 0;
   let found = false;
   for (const raw of tokens) {
-    const t = raw.replace(/[^\wçãéíóáâ]/gi, "");
+    const t = raw.replace(/[^\wçãéêíóôáâàú]/gi, "");
     if (!t) continue;
     if (t === "e") continue;
     if (/^\d+$/.test(t)) {
@@ -77,7 +77,7 @@ export function parseVoiceTranscript(transcript: string): VoiceParseResult {
 
   // ── 3. Padrão FALADO: "por cinco e noventa" / "por vinte e cinco reais e noventa"
   if (!price) {
-    const spoken = text.match(/\b(?:por|custa|sai por|a|de)\s+([a-zçãéíóáâ\s]+?)(?:\s+(reais?|centavos|pila)\b|\.|$)/);
+    const spoken = text.match(/\b(?:por|custa|sai por|a|de)\s+([a-zçãéêíóôáâàú\s]+?)(?:\s+(reais?|centavos|pila)\b|\.|$)/);
     if (spoken) {
       const phrase = spoken[1].trim();
       const tokens = phrase.split(/\s+/);

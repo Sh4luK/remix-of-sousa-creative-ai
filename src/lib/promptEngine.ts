@@ -22,7 +22,6 @@ export interface GenerationInput {
   extraInfo?: string;
   textRules: string;
   applyLogo?: boolean;
-  applySeal?: boolean;
   applyPromoBand?: boolean;
   applyUrgency?: boolean;
   productImageBase64?: string;
@@ -208,7 +207,6 @@ export function buildPrompt(input: GenerationInput): string {
   const extras: string[] = [];
   if (input.applyPromoBand) extras.push("bold promotional banner strip");
   if (input.applyUrgency) extras.push("visual urgency elements (burst shapes, flash indicators, limited-time cues)");
-  if (input.applyLogo) extras.push("space for brand logo placement");
   if (input.applyLogo) {
     extras.push("the Comercial Sousa Atacarejo brand logo (attached as reference image) must be placed visibly and integrated into the composition, preferably in a corner or header area without obstructing the product");
   }
@@ -225,7 +223,7 @@ export function buildPrompt(input: GenerationInput): string {
     `The image must look like a real, professionally produced supermarket advertisement ready for social media. Part of the Comercial Sousa brand ecosystem.`
   );
 
-  // ── Section 10: Negative Prompt ──
+  // ── Section 11: Negative Prompt ──
   sections.push(`Negative: ${NEGATIVE_PROMPT}`);
 
   return sections.join("\n\n");

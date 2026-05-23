@@ -84,6 +84,37 @@ const LOADING_MESSAGES = [
   "Quase pronto...",
 ];
 
+// Comprime e redimensiona uma imagem via canvas — máx 1024px, webp 0.82
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1024;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width >= height) { height = Math.round((height * MAX) / width); width = MAX; }
+        else { width = Math.round((width * MAX) / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/webp", 0.82);
+      // base64 overhead is ~4/3; approximate byte size
+      const byteCount = Math.ceil(((dataUrl.length - dataUrl.indexOf(",") - 1) * 3) / 4);
+      if (byteCount > 2 * 1024 * 1024) {
+        reject(new Error("Imagem muito grande mesmo após compressão. Use uma foto menor."));
+      } else {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Erro ao carregar imagem.")); };
+    img.src = url;
+  });
+}
+
 // Formata input de preço estilo "R$ 19,90"
 function formatPrice(raw: string): string {
   const digits = raw.replace(/\D/g, "");
@@ -157,24 +188,24 @@ export default function NewGeneration() {
     return MOCK_PRODUCTS.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 6);
   }, [search]);
 
-  // Upload de imagem do produto
-  const handleUpload = (file: File) => {
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error("A foto está muito grande. Máximo 4MB.");
+  // Upload de imagem do produto (com compressão via canvas)
+  const handleUpload = async (file: File) => {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Formato inválido. Use JPG, PNG ou WebP.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
+    try {
+      const base64 = await compressImage(file);
       setPick({
         kind: "upload",
         name: file.name.replace(/\.[^.]+$/, ""),
         previewUrl: base64,
         base64,
       });
-      toast.success("Foto enviada!");
-    };
-    reader.readAsDataURL(file);
+      toast.success("Foto enviada e otimizada!");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao processar imagem.");
+    }
   };
 
   // Modo Mágico por Voz: transcreve → autopreenche → avança para Etapa 2
@@ -243,29 +274,41 @@ export default function NewGeneration() {
     setLoading(true);
     setResult(null);
 
+    let brandPrimaryColor = "";
+    let brandSecondaryColor = "";
+    let brandSignature = "";
+    try {
+      const brandRaw = localStorage.getItem("sousa-creative-brand");
+      if (brandRaw) {
+        const brand = JSON.parse(brandRaw);
+        brandPrimaryColor = brand.colors?.[0] ?? "";
+        brandSecondaryColor = brand.colors?.[1] ?? "";
+        brandSignature = brand.signature ?? "";
+      }
+    } catch { /* use defaults */ }
+
     const input: GenerationInput = {
       productName: pick.name,
       brand: "",
       category: pick.kind === "catalog" ? pick.category : "outros",
       price: currentPrice,
       previousPrice,
-      discount: discountSeal,
+      discount: "",
       quantity,
       promoText: "",
       seal: discountSeal,
       format: "1:1",
       style: styleId,
       background: styleId === "bebidas-geladas" ? "freezer" : "estudio-clean",
-      primaryColors: "",
-      secondaryColors: "",
+      primaryColors: brandPrimaryColor,
+      secondaryColors: brandSecondaryColor,
       intensity: styleId === "premium-varejo" ? "media" : "alta",
       headline,
       secondaryText: "",
       cta: "",
-      extraInfo: "",
+      extraInfo: brandSignature ? `Footer signature: "${brandSignature}"` : "",
       textRules: "espaco-preco",
       applyLogo: true,
-      applySeal: !!discountSeal,
       applyPromoBand: styleId === "promocional-popular" || styleId === "atacarejo-forte",
       applyUrgency: styleId === "promocional-popular",
       productImageBase64: pick.kind === "upload" ? pick.base64 : undefined,
@@ -301,7 +344,7 @@ export default function NewGeneration() {
       setLoadingProgress(100);
       setResult(data.imageUrl);
       try {
-        addToLibrary({
+        await addToLibrary({
           imageUrl: data.imageUrl,
           prompt,
           productName: pick.name,
@@ -309,7 +352,7 @@ export default function NewGeneration() {
           style: styleId,
           format: "1:1",
         });
-      } catch { /* storage cheio */ }
+      } catch { /* non-critical — generation succeeded */ }
       toast.success("Encarte gerado com sucesso!");
     } catch (err: any) {
       console.error(err);
@@ -351,10 +394,12 @@ export default function NewGeneration() {
     setSearch("");
     setPick(null);
     setCurrentPrice("");
+    setVoicePrice(null);
     setPreviousPrice("");
     setQuantity("");
     setHeadline("");
     setDiscountSeal("");
+    setShowAdvanced(false);
   };
 
   // ────────── LOADING OVERLAY ──────────
