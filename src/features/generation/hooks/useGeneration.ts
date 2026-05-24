@@ -60,7 +60,7 @@ export function useGeneration() {
     let brandLogoUrl = "";
 
     try {
-      const brandRaw = localStorage.getItem("sousa-creative-brand");
+      const brandRaw = localStorage.getItem("pj-midia-brand");
       if (brandRaw) {
         const brand = JSON.parse(brandRaw);
         brandPrimaryColor = brand.colors?.[0] ?? "";
@@ -76,7 +76,7 @@ export function useGeneration() {
     const input: GenerationInput = {
       productName: pick.name,
       brand: "",
-      brandName: brandName || "Comercial Sousa",
+      brandName: brandName || "PJ Mídia",
       category: pick.kind === "catalog" ? pick.category : "outros",
       price: currentPrice,
       previousPrice,

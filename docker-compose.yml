@@ -4,7 +4,7 @@ services:
     build:
       context: .
       target: base
-    container_name: sousa-creative-ai-dev
+    container_name: pj-midia-dev
     ports:
       - "3000:8080"
     volumes:
@@ -23,7 +23,7 @@ services:
     build:
       context: .
       target: production
-    container_name: sousa-creative-ai-prod
+    container_name: pj-midia-prod
     ports:
       - "3001:80"
     restart: always

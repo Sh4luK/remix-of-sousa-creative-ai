@@ -9,6 +9,7 @@ import {
   Palette,
   Menu,
   LogOut,
+  Package,
 } from "lucide-react";
 import logoImg from "@/assets/logo-comercial-sousa.png";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { to: "/nova-arte", label: "Nova Arte", icon: PlusCircle },
   { to: "/presets", label: "Estilos de Arte", icon: Layers },
   { to: "/biblioteca", label: "Minhas Artes", icon: Image },
+  { to: "/catalogo", label: "Meu Catálogo", icon: Package },
   { to: "/marca", label: "Config. Marca", icon: Palette },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
@@ -43,10 +45,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }`}
       >
         <div className="flex h-16 items-center gap-2.5 px-5 border-b border-sidebar-border">
-          <img src={logoImg} alt="Comercial Sousa" className="h-9 w-9 rounded-lg object-contain" />
+          <img src={logoImg} alt="PJ Mídia" className="h-9 w-9 rounded-lg object-contain" />
           <div>
             <h1 className="text-sm font-bold text-sidebar-primary-foreground leading-none">
-              Sousa Creative
+              PJ Mídia
             </h1>
             <span className="text-[11px] font-medium text-sidebar-foreground/60">
               AI Image Studio
@@ -101,8 +103,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <img src={logoImg} alt="Comercial Sousa" className="h-7 w-7 rounded object-contain" />
-          <span className="font-semibold text-sm">Sousa Creative AI</span>
+          <img src={logoImg} alt="PJ Mídia" className="h-7 w-7 rounded object-contain" />
+          <span className="font-semibold text-sm">PJ Mídia</span>
         </header>
 
         <main className="min-h-screen">{children}</main>

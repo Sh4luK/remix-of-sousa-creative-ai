@@ -275,7 +275,7 @@ export function buildPrompt(input: GenerationInput): string {
   if (input.applyPromoBand) extras.push("bold promotional banner strip");
   if (input.applyUrgency) extras.push("visual urgency elements (burst shapes, flash indicators, limited-time cues)");
   if (input.applyLogo) {
-    extras.push(`the ${input.brandName || "Comercial Sousa"} brand logo (attached as reference image) must be placed visibly and integrated into the composition, preferably in a corner or header area without obstructing the product`);
+    extras.push(`the ${input.brandName || "PJ Mídia"} brand logo (attached as reference image) must be placed visibly and integrated into the composition, preferably in a corner or header area without obstructing the product`);
   }
   if (extras.length > 0) {
     sections.push(`Additional elements: ${extras.join(", ")}.`);
@@ -287,7 +287,7 @@ export function buildPrompt(input: GenerationInput): string {
 
   // ── Section 10: Brand Context ──
   sections.push(
-    `The image must look like a real, professionally produced supermarket advertisement ready for social media. Part of the ${input.brandName || "Comercial Sousa"} brand ecosystem.`
+    `The image must look like a real, professionally produced supermarket advertisement ready for social media. Part of the ${input.brandName || "PJ Mídia"} brand ecosystem.`
   );
 
   // ── Section 11: Negative Prompt ──

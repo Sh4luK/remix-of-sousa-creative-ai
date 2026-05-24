@@ -23,7 +23,7 @@ interface DBRow {
 }
 
 // ── Guest localStorage (unauthenticated fallback) ─────────────────────────────
-const GUEST_KEY = "sousa-creative-library-guest";
+const GUEST_KEY = "pj-midia-library-guest";
 const GUEST_MAX = 50; // raised maximum capacity for guests to enjoy pagination
 
 function loadGuest(): GeneratedImage[] {

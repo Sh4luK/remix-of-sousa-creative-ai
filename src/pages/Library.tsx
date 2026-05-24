@@ -41,7 +41,7 @@ export default function Library() {
   const handleDownload = (img: GeneratedImage) => {
     const a = document.createElement("a");
     a.href = img.imageUrl;
-    a.download = `sousa-${img.productName.replace(/\s+/g, "-")}-${Date.now()}.png`;
+    a.download = `pjmidia-${img.productName.replace(/\s+/g, "-")}-${Date.now()}.png`;
     a.click();
   };
 

@@ -19,15 +19,15 @@ interface BrandConfig {
   logoUrl?: string;          // URL customizada para o logotipo
 }
 
-const STORAGE_KEY = "sousa-creative-brand";
+const STORAGE_KEY = "pj-midia-brand";
 
 const DEFAULT_BRAND: BrandConfig = {
-  name: "Comercial Sousa",
+  name: "PJ Mídia",
   slogan: "Economia de verdade, todo dia!",
   colors: ["#E63946", "#FFB703", "#FFFFFF"],
   defaultPhrase: "Aproveite as ofertas da semana",
   buttonText: "Aproveite!",
-  signature: "Comercial Sousa — Sempre perto de você",
+  signature: "PJ Mídia — Sempre perto de você",
   logoUrl: "/logo-comercial-sousa.png",
 };
 

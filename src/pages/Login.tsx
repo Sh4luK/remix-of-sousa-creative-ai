@@ -57,10 +57,10 @@ export default function Login() {
         <div className="text-center mb-8">
           <img
             src={logoImg}
-            alt="Comercial Sousa"
+            alt="PJ Mídia"
             className="h-16 w-16 mx-auto rounded-2xl object-contain mb-4"
           />
-          <h1 className="text-3xl font-bold text-slate-900">Sousa Creative</h1>
+          <h1 className="text-3xl font-bold text-slate-900">PJ Mídia</h1>
           <p className="text-base text-slate-600 mt-2">Entre para criar suas artes</p>
         </div>
 

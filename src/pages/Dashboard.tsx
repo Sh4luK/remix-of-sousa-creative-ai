@@ -38,10 +38,10 @@ export default function Dashboard() {
       {/* Header */}
       <div className="animate-fade-up">
         <h1 className="text-2xl font-bold tracking-tight text-balance">
-          Sousa Creative AI
+          PJ Mídia
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Gere artes promocionais profissionais para o Comercial Sousa
+          Gere artes promocionais profissionais para a PJ Mídia
         </p>
       </div>
 

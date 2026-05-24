@@ -8,6 +8,7 @@ import Library from "@/pages/Library";
 import Presets from "@/pages/Presets";
 import BrandSettings from "@/pages/BrandSettings";
 import SettingsPage from "@/pages/SettingsPage";
+import ProductCatalog from "@/pages/ProductCatalog";
 import Login from "@/pages/Login";
 import NotFound from "./pages/NotFound.tsx";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,6 +37,7 @@ function ProtectedRoutes() {
         <Route path="/nova-arte" element={<NewGeneration />} />
         <Route path="/biblioteca" element={<Library />} />
         <Route path="/presets" element={<Presets />} />
+        <Route path="/catalogo" element={<ProductCatalog />} />
         <Route path="/marca" element={<BrandSettings />} />
         <Route path="/configuracoes" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />

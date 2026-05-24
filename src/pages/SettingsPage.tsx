@@ -48,7 +48,7 @@ export default function SettingsPage() {
 
         <div className="rounded-xl border border-border bg-card p-5">
           <h3 className="font-semibold mb-1">Versão</h3>
-          <p className="text-sm text-muted-foreground">Sousa Creative AI v1.0</p>
+          <p className="text-sm text-muted-foreground">PJ Mídia v1.0</p>
         </div>
       </div>
     </div>
