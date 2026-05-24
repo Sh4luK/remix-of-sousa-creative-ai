@@ -11,6 +11,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import Login from "@/pages/Login";
 import NotFound from "./pages/NotFound.tsx";
 import { useAuth } from "@/hooks/useAuth";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function ProtectedRoutes() {
   const { session, loading } = useAuth();
@@ -48,7 +49,14 @@ const App = () => (
     <Toaster />
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/*" element={<ProtectedRoutes />} />
+      <Route 
+        path="/*" 
+        element={
+          <ErrorBoundary>
+            <ProtectedRoutes />
+          </ErrorBoundary>
+        } 
+      />
     </Routes>
   </BrowserRouter>
 );

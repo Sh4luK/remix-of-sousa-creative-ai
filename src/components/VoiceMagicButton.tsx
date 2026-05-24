@@ -2,13 +2,44 @@ import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-// Polyfill de tipos para a Web Speech API (não está no lib.dom padrão).
-type SR = any;
+interface SpeechRecognitionEvent {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: {
+      isFinal: boolean;
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
+
+interface SpeechRecognitionInstance {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onstart: () => void;
+  onresult: (e: SpeechRecognitionEvent) => void;
+  onerror: (e: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+  start: () => void;
+  stop: () => void;
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognitionInstance;
+}
 
 declare global {
   interface Window {
-    SpeechRecognition?: SR;
-    webkitSpeechRecognition?: SR;
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
   }
 }
 
@@ -20,7 +51,7 @@ export function VoiceMagicButton({ onResult }: VoiceMagicButtonProps) {
   const [supported, setSupported] = useState(false);
   const [recording, setRecording] = useState(false);
   const [interim, setInterim] = useState("");
-  const recRef = useRef<any>(null);
+  const recRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -48,7 +79,7 @@ export function VoiceMagicButton({ onResult }: VoiceMagicButtonProps) {
       setInterim("");
     };
 
-    rec.onresult = (e: any) => {
+    rec.onresult = (e: SpeechRecognitionEvent) => {
       let interimText = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const transcript = e.results[i][0].transcript;
@@ -59,7 +90,7 @@ export function VoiceMagicButton({ onResult }: VoiceMagicButtonProps) {
       setInterim(interimText || finalText);
     };
 
-    rec.onerror = (e: any) => {
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
       setRecording(false);
       setInterim("");
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {

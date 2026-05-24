@@ -12,9 +12,19 @@ export interface GeneratedImage {
   favorite: boolean;
 }
 
+interface DBRow {
+  id: string;
+  user_id: string;
+  prompt: string;
+  image_url: string;
+  storage_path?: string | null;
+  metadata?: unknown;
+  created_at: string;
+}
+
 // ── Guest localStorage (unauthenticated fallback) ─────────────────────────────
 const GUEST_KEY = "sousa-creative-library-guest";
-const GUEST_MAX = 3;
+const GUEST_MAX = 50; // raised maximum capacity for guests to enjoy pagination
 
 function loadGuest(): GeneratedImage[] {
   try {
@@ -44,40 +54,53 @@ async function getUserId(): Promise<string | null> {
 }
 
 // ── DB row → GeneratedImage ───────────────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function fromRow(row: any): GeneratedImage {
-  const meta = (row.metadata ?? {}) as Record<string, unknown>;
+function fromRow(row: DBRow): GeneratedImage {
+  const meta = (row.metadata || {}) as Record<string, unknown>;
   return {
-    id: row.id as string,
-    imageUrl: row.image_url as string,
-    prompt: row.prompt as string,
+    id: row.id,
+    imageUrl: row.image_url,
+    prompt: row.prompt,
     productName: (meta.productName as string) ?? "",
     category: (meta.category as string) ?? "",
     style: (meta.style as string) ?? "",
     format: (meta.format as string) ?? "",
-    createdAt: row.created_at as string,
+    createdAt: row.created_at,
     favorite: (meta.favorite as boolean) ?? false,
   };
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-export async function getLibrary(): Promise<GeneratedImage[]> {
+// ── Public API with Cursor Pagination ─────────────────────────────────────────
+export async function getLibrary(cursorCreatedAt?: string, limit = 20): Promise<GeneratedImage[]> {
   const userId = await getUserId();
 
   if (!userId) {
-    return loadGuest().sort(
+    const local = loadGuest().sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+    if (cursorCreatedAt) {
+      return local.filter(item => new Date(item.createdAt).getTime() < new Date(cursorCreatedAt).getTime()).slice(0, limit);
+    }
+    return local.slice(0, limit);
   }
 
-  const { data } = await supabase
+  let query = supabase
     .from("generations")
     .select("*")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(20);
+    .order("created_at", { ascending: false });
 
-  return (data ?? []).map(fromRow);
+  if (cursorCreatedAt) {
+    query = query.lt("created_at", cursorCreatedAt);
+  }
+
+  const { data, error } = await query.limit(limit);
+
+  if (error) {
+    console.error("Failed to query generations:", error.message);
+    return [];
+  }
+
+  return (data as DBRow[] || []).map(fromRow);
 }
 
 export async function addToLibrary(
@@ -100,6 +123,7 @@ export async function addToLibrary(
       user_id: userId,
       prompt: item.prompt,
       image_url: item.imageUrl,
+      storage_path: "", // inserted via Edge Function normally, this is fallback/redundancy
       metadata: {
         productName: item.productName,
         category: item.category,
@@ -112,7 +136,7 @@ export async function addToLibrary(
     .single();
 
   if (error) throw error;
-  return fromRow(data);
+  return fromRow(data as DBRow);
 }
 
 export async function toggleFavorite(id: string): Promise<void> {
@@ -125,15 +149,15 @@ export async function toggleFavorite(id: string): Promise<void> {
     return;
   }
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("generations")
     .select("metadata")
     .eq("id", id)
     .eq("user_id", userId)
     .single();
 
-  if (!data) return;
-  const meta = (data.metadata ?? {}) as Record<string, unknown>;
+  if (error || !data) return;
+  const meta = (data.metadata || {}) as Record<string, unknown>;
 
   await supabase
     .from("generations")
@@ -150,9 +174,13 @@ export async function deleteFromLibrary(id: string): Promise<void> {
     return;
   }
 
-  await supabase
+  const { error } = await supabase
     .from("generations")
     .delete()
     .eq("id", id)
     .eq("user_id", userId);
+
+  if (error) {
+    console.error("Failed to delete generation row:", error.message);
+  }
 }

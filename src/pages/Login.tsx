@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import logoImg from "@/assets/logo-comercial-sousa.png";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 export default function Login() {
   const { session, loading } = useAuth();
@@ -16,15 +17,28 @@ export default function Login() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [busy, setBusy] = useState(false);
 
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+
   if (!loading && session) return <Navigate to="/" replace />;
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "signup" && !turnstileToken) {
+      toast.error("Por favor, conclua a validação anti-bot (captcha) antes de prosseguir.");
+      return;
+    }
+
     setBusy(true);
     const { error } =
       mode === "signin"
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        : await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              captchaToken: turnstileToken || undefined,
+            },
+          });
     if (error) toast.error(error.message);
     else if (mode === "signup")
       toast.success("Conta criada! Verifique seu e-mail antes de entrar.");
@@ -34,7 +48,6 @@ export default function Login() {
   const handleGoogle = () => {
     supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin },
     });
   };
 
@@ -84,6 +97,15 @@ export default function Login() {
                 />
               </div>
             </div>
+            {mode === "signup" && (
+              <div className="flex justify-center py-2">
+                <Turnstile
+                  siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"}
+                  onSuccess={(token) => setTurnstileToken(token)}
+                />
+              </div>
+            )}
+
             <Button
               type="submit"
               disabled={busy}

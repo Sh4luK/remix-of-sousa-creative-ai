@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Save, Store, Palette, MessageSquare, Plus, X } from "lucide-react";
+import { Save, Store, Palette, MessageSquare, Plus, X, Upload } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BrandConfig {
   name: string;
@@ -29,23 +31,18 @@ const DEFAULT_BRAND: BrandConfig = {
   logoUrl: "/logo-comercial-sousa.png",
 };
 
-function loadBrand(): BrandConfig {
+function loadLocalBrand(): BrandConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_BRAND;
     const parsed = JSON.parse(raw);
-    // Migra formato antigo se necessário
     return {
       name: parsed.name ?? DEFAULT_BRAND.name,
       slogan: parsed.slogan ?? DEFAULT_BRAND.slogan,
-      colors: Array.isArray(parsed.colors)
-        ? parsed.colors
-        : typeof parsed.officialColors === "string"
-          ? DEFAULT_BRAND.colors
-          : DEFAULT_BRAND.colors,
-      defaultPhrase: parsed.defaultPhrase ?? parsed.promoStyle ?? DEFAULT_BRAND.defaultPhrase,
-      buttonText: parsed.buttonText ?? parsed.defaultCta ?? DEFAULT_BRAND.buttonText,
-      signature: parsed.signature ?? parsed.campaignSignature ?? DEFAULT_BRAND.signature,
+      colors: Array.isArray(parsed.colors) ? parsed.colors : DEFAULT_BRAND.colors,
+      defaultPhrase: parsed.defaultPhrase ?? DEFAULT_BRAND.defaultPhrase,
+      buttonText: parsed.buttonText ?? DEFAULT_BRAND.buttonText,
+      signature: parsed.signature ?? DEFAULT_BRAND.signature,
       logoUrl: parsed.logoUrl ?? DEFAULT_BRAND.logoUrl,
     };
   } catch {
@@ -54,7 +51,39 @@ function loadBrand(): BrandConfig {
 }
 
 export default function BrandSettings() {
-  const [brand, setBrand] = useState<BrandConfig>(loadBrand());
+  const { user } = useAuth();
+  const [brand, setBrand] = useState<BrandConfig>(loadLocalBrand());
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Sync Supabase brand configuration if logged in
+  useEffect(() => {
+    if (!user) return;
+
+    supabase
+      .from("brands")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!error && data) {
+          const parsedColors = Array.isArray(data.colors) ? (data.colors as string[]) : DEFAULT_BRAND.colors;
+          const loaded: BrandConfig = {
+            name: data.name,
+            slogan: data.slogan || "",
+            colors: parsedColors,
+            defaultPhrase: data.default_phrase || "",
+            buttonText: data.button_text || "",
+            signature: data.signature || "",
+            logoUrl: data.logo_path 
+              ? supabase.storage.from("brand-logos").getPublicUrl(data.logo_path).data.publicUrl 
+              : DEFAULT_BRAND.logoUrl,
+          };
+          setBrand(loaded);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
+        }
+      });
+  }, [user]);
 
   const update = <K extends keyof BrandConfig>(key: K, value: BrandConfig[K]) =>
     setBrand((prev) => ({ ...prev, [key]: value }));
@@ -74,9 +103,65 @@ export default function BrandSettings() {
     update("colors", brand.colors.filter((_, idx) => idx !== i));
   };
 
-  const handleSave = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(brand));
-    toast.success("Configurações salvas com sucesso!");
+  const handleSave = async () => {
+    setSaving(true);
+    let logoPath: string | null = null;
+
+    if (user) {
+      try {
+        if (logoFile) {
+          // Upload brand logo file to storage bucket
+          const fileExt = logoFile.name.split('.').pop() || 'webp';
+          logoPath = `${user.id}/logo-${Date.now()}.${fileExt}`;
+          
+          const { error: uploadErr } = await supabase.storage
+            .from("brand-logos")
+            .upload(logoPath, logoFile, { upsert: true });
+
+          if (uploadErr) throw uploadErr;
+        } else if (brand.logoUrl && brand.logoUrl.includes("/brand-logos/")) {
+          // Extract existing storage path from URL if present
+          const existingPath = brand.logoUrl.split("/brand-logos/").pop()?.split("?")[0];
+          if (existingPath) logoPath = decodeURIComponent(existingPath);
+        }
+
+        const { error: dbErr } = await supabase
+          .from("brands")
+          .upsert({
+            user_id: user.id,
+            name: brand.name,
+            slogan: brand.slogan,
+            colors: brand.colors,
+            default_phrase: brand.defaultPhrase,
+            button_text: brand.buttonText,
+            signature: brand.signature,
+            logo_path: logoPath,
+            updated_at: new Date().toISOString(),
+          });
+
+        if (dbErr) throw dbErr;
+
+        const finalLogoUrl = logoPath
+          ? supabase.storage.from("brand-logos").getPublicUrl(logoPath).data.publicUrl
+          : brand.logoUrl;
+
+        const savedBrand = { ...brand, logoUrl: finalLogoUrl };
+        setBrand(savedBrand);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedBrand));
+        
+        toast.success("Configurações salvas e sincronizadas com sucesso!");
+      } catch (err: unknown) {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Falha ao salvar configurações no servidor.");
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      // Local fallback for guest users
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(brand));
+      toast.success("Configurações salvas localmente!");
+      setSaving(false);
+    }
   };
 
   return (
@@ -113,7 +198,7 @@ export default function BrandSettings() {
                     <Store className="h-4 w-4" /> Dados Básicos
                   </div>
                   <div className="text-xs text-slate-500 font-normal">
-                    Nome do comércio e slogan
+                    Nome do comércio, slogan e logo
                   </div>
                 </div>
               </div>
@@ -141,16 +226,35 @@ export default function BrandSettings() {
                 </p>
               </div>
               <div>
-                <Label className="text-sm font-medium text-slate-700">Imagem do seu logo</Label>
-                <Input
-                  value={brand.logoUrl || ""}
-                  onChange={(e) => update("logoUrl", e.target.value)}
-                  placeholder="Cole aqui o link da imagem"
-                  className="mt-1.5 h-12"
-                />
-                <p className="text-xs text-slate-500 mt-1.5">
-                  Use o link de uma imagem do seu logo na internet (PNG ou JPG). Se deixar em branco, usamos o logo padrão.
-                </p>
+                <Label className="text-sm font-medium text-slate-700">Logo da sua Marca</Label>
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex-1">
+                    <div className="relative border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-sky-400 hover:bg-sky-50/50 transition">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setLogoFile(file);
+                            const r = new FileReader();
+                            r.onload = () => update("logoUrl", r.result as string);
+                            r.readAsDataURL(file);
+                          }
+                        }}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                      <Upload className="h-5 w-5 text-slate-400 mb-1" />
+                      <span className="text-xs font-semibold text-slate-600">Escolher arquivo de logo</span>
+                      <span className="text-[10px] text-slate-400 mt-0.5">PNG transparente, JPG ou WebP</span>
+                    </div>
+                  </div>
+                  {brand.logoUrl && (
+                    <div className="h-16 w-16 border rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center shrink-0 p-1">
+                      <img src={brand.logoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
+                    </div>
+                  )}
+                </div>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -295,10 +399,11 @@ export default function BrandSettings() {
           <Button
             onClick={handleSave}
             size="lg"
-            className="w-full h-14 text-base font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-md"
+            disabled={saving}
+            className="w-full h-14 text-base font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-md transition-all"
           >
             <Save className="h-5 w-5 mr-2" />
-            Salvar Configurações
+            {saving ? "Salvando Configurações..." : "Salvar Configurações"}
           </Button>
         </div>
       </div>
