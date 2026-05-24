@@ -47,8 +47,8 @@ export default function Login() {
             alt="Comercial Sousa"
             className="h-16 w-16 mx-auto rounded-2xl object-contain mb-4"
           />
-          <h1 className="text-2xl font-bold text-slate-900">Sousa Creative AI</h1>
-          <p className="text-sm text-slate-500 mt-1">Faça login para começar a criar</p>
+          <h1 className="text-3xl font-bold text-slate-900">Sousa Creative</h1>
+          <p className="text-base text-slate-600 mt-2">Entre para criar suas artes</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
@@ -64,7 +64,7 @@ export default function Login() {
                   placeholder="seu@email.com"
                   required
                   autoComplete="email"
-                  className="pl-10 h-11"
+                  className="pl-10 h-12 text-base"
                 />
               </div>
             </div>
@@ -80,16 +80,16 @@ export default function Login() {
                   required
                   minLength={6}
                   autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                  className="pl-10 h-11"
+                  className="pl-10 h-12 text-base"
                 />
               </div>
             </div>
             <Button
               type="submit"
               disabled={busy}
-              className="w-full h-11 bg-orange-500 hover:bg-orange-600 text-white font-semibold"
+              className="w-full h-12 bg-sky-600 hover:bg-sky-700 text-white font-semibold text-base"
             >
-              <LogIn className="h-4 w-4 mr-2" />
+              <LogIn className="h-5 w-5 mr-2" />
               {busy ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta"}
             </Button>
           </form>
@@ -105,7 +105,7 @@ export default function Login() {
             variant="outline"
             onClick={handleGoogle}
             disabled={busy}
-            className="w-full h-11 font-medium"
+            className="w-full h-12 font-medium text-base"
           >
             <svg className="h-4 w-4 mr-2 shrink-0" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -121,7 +121,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-              className="text-orange-600 font-medium hover:underline"
+              className="text-sky-700 font-medium hover:underline"
             >
               {mode === "signin" ? "Criar agora" : "Entrar"}
             </button>

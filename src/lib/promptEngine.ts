@@ -26,18 +26,84 @@ export interface GenerationInput {
   applyUrgency?: boolean;
   productImageBase64?: string;
   backgroundImageBase64?: string;
+  brandName?: string; // Nome dinâmico do supermercado/comércio
 }
 
-const STYLE_MAP: Record<string, string> = {
-  "promocional-popular": "bold Brazilian popular retail advertising style, high contrast, vibrant, aggressive pricing feel, eye-catching colors, strong commercial impact",
-  "atacarejo-forte": "robust wholesale warehouse style, bulk economy feel, aggressive pricing, strong volume emphasis, no-frills commercial impact",
-  "clean-moderno": "clean modern supermarket advertising, organized layout, contemporary retail design, polished and professional",
-  "premium-varejo": "premium retail advertising, elegant product presentation, high-end supermarket feel, sophisticated lighting",
-  "descartaveis": "clean utilitarian commercial style, organized packaging presentation, practical economy focus, clear product arrangement",
-  "acougue-realista": "realistic butcher shop style, fresh meat presentation, professional food photography, appetizing and clean",
-  "bebidas-geladas": "cold refreshing beverage style, condensation drops, ice crystals, bright reflections, thirst-inducing commercial feel",
-  "tabloide-digital": "digital tabloid advertising style, bold typography spaces, structured promotional grid, newspaper-inspired commercial layout",
-};
+export interface StyleConfig {
+  value: string;
+  label: string;
+  icon: string;
+  desc: string;
+  preview: string;
+  promptStyle: string;
+}
+
+export const STYLES: StyleConfig[] = [
+  {
+    value: "promocional-popular",
+    label: "Oferta Popular",
+    icon: "🔥",
+    desc: "Cores fortes e chamativas",
+    preview: "linear-gradient(135deg,#fb923c 0%,#dc2626 60%,#facc15 100%)",
+    promptStyle: "bold Brazilian popular retail advertising style, high contrast, vibrant, aggressive pricing feel, eye-catching colors, strong commercial impact",
+  },
+  {
+    value: "premium-varejo",
+    label: "Premium Clean",
+    icon: "✨",
+    desc: "Elegante e sofisticado",
+    preview: "linear-gradient(135deg,#0f172a 0%,#475569 60%,#cbd5e1 100%)",
+    promptStyle: "premium retail advertising, elegant product presentation, high-end supermarket feel, sophisticated lighting",
+  },
+  {
+    value: "atacarejo-forte",
+    label: "Atacarejo",
+    icon: "📦",
+    desc: "Volume e economia",
+    preview: "linear-gradient(135deg,#1e3a8a 0%,#2563eb 60%,#facc15 100%)",
+    promptStyle: "robust wholesale warehouse style, bulk economy feel, aggressive pricing, strong volume emphasis, no-frills commercial impact",
+  },
+  {
+    value: "bebidas-geladas",
+    label: "Bebidas Geladas",
+    icon: "🧊",
+    desc: "Frio e refrescante",
+    preview: "linear-gradient(135deg,#0ea5e9 0%,#22d3ee 60%,#e0f2fe 100%)",
+    promptStyle: "cold refreshing beverage style, condensation drops, ice crystals, bright reflections, thirst-inducing commercial feel",
+  },
+  {
+    value: "acougue-realista",
+    label: "Açougue",
+    icon: "🥩",
+    desc: "Fresco e profissional",
+    preview: "linear-gradient(135deg,#7f1d1d 0%,#dc2626 60%,#fca5a5 100%)",
+    promptStyle: "realistic butcher shop style, fresh meat presentation, professional food photography, appetizing and clean",
+  },
+  {
+    value: "clean-moderno",
+    label: "Clean Moderno",
+    icon: "🛍️",
+    desc: "Organizado e limpo",
+    preview: "linear-gradient(135deg,#f8fafc 0%,#e2e8f0 60%,#94a3b8 100%)",
+    promptStyle: "clean modern supermarket advertising, organized layout, contemporary retail design, polished and professional",
+  },
+  {
+    value: "descartaveis",
+    label: "Descartáveis Utilitário",
+    icon: "🥤",
+    desc: "Limpo e utilitário",
+    preview: "linear-gradient(135deg,#e2e8f0 0%,#cbd5e1 60%,#94a3b8 100%)",
+    promptStyle: "clean utilitarian commercial style, organized packaging presentation, practical economy focus, clear product arrangement",
+  },
+  {
+    value: "tabloide-digital",
+    label: "Tabloide Digital",
+    icon: "📰",
+    desc: "Grid de ofertas clássico",
+    preview: "linear-gradient(135deg,#b91c1c 0%,#ef4444 60%,#f59e0b 100%)",
+    promptStyle: "digital tabloid advertising style, bold typography spaces, structured promotional grid, newspaper-inspired commercial layout",
+  },
+];
 
 const BACKGROUND_MAP: Record<string, string> = {
   "solido": "solid clean colored background",
@@ -117,7 +183,8 @@ function hasTextContent(input: GenerationInput): boolean {
 }
 
 export function buildPrompt(input: GenerationInput): string {
-  const style = STYLE_MAP[input.style] || STYLE_MAP["promocional-popular"];
+  const selectedStyle = STYLES.find((s) => s.value === input.style) || STYLES[0];
+  const style = selectedStyle.promptStyle;
   const bg = BACKGROUND_MAP[input.background] || BACKGROUND_MAP["estudio-clean"];
   const intensity = INTENSITY_MAP[input.intensity] || INTENSITY_MAP["media"];
   const categoryCtx = CATEGORY_CONTEXT[input.category] || CATEGORY_CONTEXT["outros"];
@@ -208,7 +275,7 @@ export function buildPrompt(input: GenerationInput): string {
   if (input.applyPromoBand) extras.push("bold promotional banner strip");
   if (input.applyUrgency) extras.push("visual urgency elements (burst shapes, flash indicators, limited-time cues)");
   if (input.applyLogo) {
-    extras.push("the Comercial Sousa Atacarejo brand logo (attached as reference image) must be placed visibly and integrated into the composition, preferably in a corner or header area without obstructing the product");
+    extras.push(`the ${input.brandName || "Comercial Sousa"} brand logo (attached as reference image) must be placed visibly and integrated into the composition, preferably in a corner or header area without obstructing the product`);
   }
   if (extras.length > 0) {
     sections.push(`Additional elements: ${extras.join(", ")}.`);
@@ -220,18 +287,13 @@ export function buildPrompt(input: GenerationInput): string {
 
   // ── Section 10: Brand Context ──
   sections.push(
-    `The image must look like a real, professionally produced supermarket advertisement ready for social media. Part of the Comercial Sousa brand ecosystem.`
+    `The image must look like a real, professionally produced supermarket advertisement ready for social media. Part of the ${input.brandName || "Comercial Sousa"} brand ecosystem.`
   );
 
   // ── Section 11: Negative Prompt ──
   sections.push(`Negative: ${NEGATIVE_PROMPT}`);
 
   return sections.join("\n\n");
-}
-
-export function buildSimplePrompt(simpleInput: string, format?: string): string {
-  const formatDesc = format ? getFormatDescription(format) : "";
-  return `Create a high-conversion Brazilian supermarket promotional image.\n\nSubject: ${simpleInput}.\n\n${formatDesc ? `Format: ${formatDesc}.\n\n` : ""}Style: bold popular retail advertising, high contrast, vibrant commercial colors. Composition: product-centered, realistic lighting, clean hierarchy, space for price overlay, supermarket context, social media ready, Brazilian market aesthetics.\n\nPart of the Comercial Sousa brand.\n\nNegative: ${NEGATIVE_PROMPT}`;
 }
 
 export interface Preset {
@@ -370,16 +432,7 @@ export const CATEGORIES = [
   { value: "outros", label: "Outros" },
 ];
 
-export const STYLES = [
-  { value: "promocional-popular", label: "Promocional Popular" },
-  { value: "atacarejo-forte", label: "Atacarejo Forte" },
-  { value: "clean-moderno", label: "Clean Moderno" },
-  { value: "premium-varejo", label: "Premium Varejo" },
-  { value: "descartaveis", label: "Descartáveis Utilitário" },
-  { value: "acougue-realista", label: "Açougue Realista" },
-  { value: "bebidas-geladas", label: "Bebidas Geladas" },
-  { value: "tabloide-digital", label: "Tabloide Digital" },
-];
+// STYLES array was unified and moved to the top of the file
 
 export const BACKGROUNDS = [
   { value: "solido", label: "Sólido" },

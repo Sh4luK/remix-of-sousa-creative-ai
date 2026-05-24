@@ -14,6 +14,7 @@ interface BrandConfig {
   defaultPhrase: string;     // texto que sempre aparece
   buttonText: string;        // antes "CTA"
   signature: string;         // assinatura no rodapé das artes
+  logoUrl?: string;          // URL customizada para o logotipo
 }
 
 const STORAGE_KEY = "sousa-creative-brand";
@@ -25,6 +26,7 @@ const DEFAULT_BRAND: BrandConfig = {
   defaultPhrase: "Aproveite as ofertas da semana",
   buttonText: "Aproveite!",
   signature: "Comercial Sousa — Sempre perto de você",
+  logoUrl: "/logo-comercial-sousa.png",
 };
 
 function loadBrand(): BrandConfig {
@@ -44,6 +46,7 @@ function loadBrand(): BrandConfig {
       defaultPhrase: parsed.defaultPhrase ?? parsed.promoStyle ?? DEFAULT_BRAND.defaultPhrase,
       buttonText: parsed.buttonText ?? parsed.defaultCta ?? DEFAULT_BRAND.buttonText,
       signature: parsed.signature ?? parsed.campaignSignature ?? DEFAULT_BRAND.signature,
+      logoUrl: parsed.logoUrl ?? DEFAULT_BRAND.logoUrl,
     };
   } catch {
     return DEFAULT_BRAND;
@@ -81,10 +84,10 @@ export default function BrandSettings() {
       <div className="p-6 lg:p-8 max-w-3xl mx-auto">
         <header className="mb-8 animate-fade-up">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            Cores e Visual da Marca
+            A cara do seu negócio
           </h1>
           <p className="text-base text-slate-600 mt-2">
-            Configure uma vez e tudo será aplicado automaticamente nas suas artes.
+            Preencha uma vez. A gente aplica essas cores e textos em todas as suas artes daqui pra frente.
           </p>
         </header>
 
@@ -102,7 +105,7 @@ export default function BrandSettings() {
           >
             <AccordionTrigger className="hover:no-underline py-5">
               <div className="flex items-center gap-3 text-left">
-                <div className="h-10 w-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
+                <div className="h-10 w-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
                   1
                 </div>
                 <div>
@@ -137,6 +140,18 @@ export default function BrandSettings() {
                   Frase curta que define seu negócio.
                 </p>
               </div>
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Imagem do seu logo</Label>
+                <Input
+                  value={brand.logoUrl || ""}
+                  onChange={(e) => update("logoUrl", e.target.value)}
+                  placeholder="Cole aqui o link da imagem"
+                  className="mt-1.5 h-12"
+                />
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Use o link de uma imagem do seu logo na internet (PNG ou JPG). Se deixar em branco, usamos o logo padrão.
+                </p>
+              </div>
             </AccordionContent>
           </AccordionItem>
 
@@ -147,7 +162,7 @@ export default function BrandSettings() {
           >
             <AccordionTrigger className="hover:no-underline py-5">
               <div className="flex items-center gap-3 text-left">
-                <div className="h-10 w-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
+                <div className="h-10 w-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
                   2
                 </div>
                 <div>
@@ -165,7 +180,7 @@ export default function BrandSettings() {
                 {brand.colors.map((hex, i) => (
                   <div key={i} className="relative group">
                     <label
-                      className="block rounded-xl border-2 border-slate-200 hover:border-orange-300 p-3 cursor-pointer transition"
+                      className="block rounded-xl border-2 border-slate-200 hover:border-sky-400 p-3 cursor-pointer transition"
                       style={{ background: hex + "10" }}
                     >
                       <div
@@ -201,7 +216,7 @@ export default function BrandSettings() {
                 {brand.colors.length < 6 && (
                   <button
                     onClick={addColor}
-                    className="rounded-xl border-2 border-dashed border-slate-200 hover:border-orange-300 hover:bg-orange-50 p-3 flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-orange-600 transition min-h-[124px]"
+                    className="rounded-xl border-2 border-dashed border-slate-200 hover:border-sky-400 hover:bg-sky-50 p-3 flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-sky-700 transition min-h-[124px]"
                   >
                     <Plus className="h-5 w-5" />
                     <span className="text-xs font-medium">Adicionar cor</span>
@@ -221,7 +236,7 @@ export default function BrandSettings() {
           >
             <AccordionTrigger className="hover:no-underline py-5">
               <div className="flex items-center gap-3 text-left">
-                <div className="h-10 w-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
+                <div className="h-10 w-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
                   3
                 </div>
                 <div>
@@ -280,7 +295,7 @@ export default function BrandSettings() {
           <Button
             onClick={handleSave}
             size="lg"
-            className="w-full h-12 text-base font-semibold bg-orange-500 hover:bg-orange-600 text-white shadow-md"
+            className="w-full h-14 text-base font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-md"
           >
             <Save className="h-5 w-5 mr-2" />
             Salvar Configurações

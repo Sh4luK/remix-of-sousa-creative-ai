@@ -1,0 +1,31 @@
+services:
+  # Serviço para Desenvolvimento Local com Hot-Reload (Vite HMR)
+  web-dev:
+    build:
+      context: .
+      target: base
+    container_name: sousa-creative-ai-dev
+    ports:
+      - "3000:8080"
+    volumes:
+      - .:/app
+      - /app/node_modules # Evita sobrescrever o node_modules do container pelo local
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true # Otimiza o watch de arquivos em sistemas virtuais ou Windows/WSL
+    stdin_open: true
+    tty: true
+
+  # Serviço para Simular o Ambiente de Produção com Nginx
+  web-prod:
+    build:
+      context: .
+      target: production
+    container_name: sousa-creative-ai-prod
+    ports:
+      - "3001:80"
+    restart: always
+    env_file:
+      - .env

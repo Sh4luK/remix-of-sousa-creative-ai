@@ -104,8 +104,8 @@ export function VoiceMagicButton({ onResult }: VoiceMagicButtonProps) {
         className={[
           "relative w-full overflow-hidden rounded-2xl p-5 text-white shadow-lg transition active:scale-[0.99]",
           recording
-            ? "bg-gradient-to-br from-red-500 to-orange-500"
-            : "bg-gradient-to-br from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600",
+            ? "bg-gradient-to-br from-rose-500 to-red-500"
+            : "bg-gradient-to-br from-sky-600 to-teal-500 hover:from-sky-700 hover:to-teal-600",
         ].join(" ")}
       >
         <div className="flex items-center gap-4">

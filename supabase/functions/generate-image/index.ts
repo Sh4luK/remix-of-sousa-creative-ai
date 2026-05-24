@@ -81,106 +81,96 @@ serve(async (req) => {
       }
     }
 
-    // ── Build AI request ───────────────────────────────────────────────────────
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    // ── Build AI request with fal.ai (Flux) ──────────────────────────────────
+    const FAL_KEY = Deno.env.get("FAL_KEY");
+    if (!FAL_KEY) throw new Error("FAL_KEY não configurada no ambiente (FAL_KEY)");
 
-    const hasImages = !!(productImage || backgroundImage || logoImage);
-    console.log("Generating image — prompt length:", prompt.length, "dimensions:", width, "x", height, "hasImages:", hasImages);
+    const FAL_MODEL = Deno.env.get("FAL_MODEL") || "fal-ai/flux/schnell";
 
-    let messageContent: unknown;
-    if (hasImages) {
-      const parts: unknown[] = [{ type: "text", text: prompt }];
-      if (productImage) {
-        parts.push({ type: "text", text: "📦 PRODUCT REFERENCE PHOTO (use this to accurately reproduce the product appearance, packaging, colors, and branding):" });
-        parts.push({ type: "image_url", image_url: { url: productImage } });
-      }
-      if (backgroundImage) {
-        parts.push({ type: "text", text: "🖼️ BACKGROUND REFERENCE PHOTO (use this as the background environment for the composition):" });
-        parts.push({ type: "image_url", image_url: { url: backgroundImage } });
-      }
-      if (logoImage) {
-        parts.push({ type: "text", text: "🏷️ BRAND LOGO (place this logo visibly in the generated image, integrated into the composition, preferably in a corner or header area):" });
-        parts.push({ type: "image_url", image_url: { url: logoImage } });
-      }
-      messageContent = parts;
-    } else {
-      messageContent = prompt;
+    // Se houver imagem de produto, usamos o modelo de image-to-image
+    const imageToUse = productImage || backgroundImage;
+    const isImageToImage = !!imageToUse;
+
+    const endpoint = isImageToImage
+      ? `https://queue.fal.run/${FAL_MODEL}/image-to-image?sync_mode=true`
+      : `https://queue.fal.run/${FAL_MODEL}?sync_mode=true`;
+
+    console.log("Generating image with fal.ai model:", FAL_MODEL, "endpoint:", endpoint, "dimensions:", width, "x", height, "isImageToImage:", isImageToImage);
+
+    const requestBody: Record<string, any> = {
+      prompt: prompt,
+      image_size: {
+        width: width || 1024,
+        height: height || 1024,
+      },
+      num_inference_steps: FAL_MODEL.includes("schnell") ? 4 : 28,
+      enable_safety_checker: true,
+      sync_mode: true,
+    };
+
+    if (isImageToImage) {
+      requestBody.image_url = imageToUse;
+      requestBody.strength = 0.55; // Força balanceada para compor mantendo as cores/detalhes do produto
     }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch(endpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Key ${FAL_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        messages: [{ role: "user", content: messageContent }],
-        modalities: ["image", "text"],
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!aiResponse.ok) {
-      if (aiResponse.status === 429) return json({ error: "Limite de requisições da IA excedido. Tente em alguns segundos." }, 429);
-      if (aiResponse.status === 402) return json({ error: "Créditos insuficientes. Adicione créditos na conta Lovable." }, 402);
+      if (aiResponse.status === 429) return json({ error: "Limite de requisições da IA fal.ai excedido. Tente em alguns segundos." }, 429);
+      if (aiResponse.status === 401 || aiResponse.status === 403) return json({ error: "Credenciais inválidas na API fal.ai." }, 401);
       const errText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errText);
-      return json({ error: "Erro ao gerar imagem. Tente novamente." }, 500);
+      console.error("fal.ai API error:", aiResponse.status, errText);
+      return json({ error: "Erro ao gerar imagem com fal.ai. Tente novamente." }, 500);
     }
 
     const aiData = await aiResponse.json();
-    const message = aiData.choices?.[0]?.message;
+    const imageUrl = aiData.images?.[0]?.url;
 
-    let imageBase64: string | null = null;
-
-    if (message?.images && Array.isArray(message.images)) {
-      for (const img of message.images) {
-        if (img.image_url?.url) { imageBase64 = img.image_url.url; break; }
-      }
-    }
-    if (!imageBase64 && message?.content && Array.isArray(message.content)) {
-      for (const part of message.content) {
-        if (part.type === "image_url" && part.image_url?.url) { imageBase64 = part.image_url.url; break; }
-        if (part.inline_data) { imageBase64 = `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`; break; }
-      }
-    }
-
-    if (!imageBase64) {
-      console.error("No image in AI response:", JSON.stringify(aiData).slice(0, 500));
-      return json({ error: "A IA não retornou uma imagem. Tente reformular seu pedido." }, 500);
+    if (!imageUrl) {
+      console.error("No image URL in fal.ai response:", JSON.stringify(aiData).slice(0, 500));
+      return json({ error: "A fal.ai não retornou uma URL de imagem. Tente reformular seu pedido." }, 500);
     }
 
     // ── Upload to storage (authenticated users only) ────────────────────────────
-    let imageUrl = imageBase64;
+    let finalImageUrl = imageUrl;
 
     if (userId) {
       try {
-        const b64 = imageBase64.replace(/^data:[^;]+;base64,/, "");
-        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-        const storagePath = `${userId}/${crypto.randomUUID()}.webp`;
+        const imageFetch = await fetch(imageUrl);
+        if (imageFetch.ok) {
+          const arrayBuffer = await imageFetch.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          const storagePath = `${userId}/${crypto.randomUUID()}.webp`;
 
-        const { error: uploadError } = await admin.storage
-          .from("generated-images")
-          .upload(storagePath, bytes, { contentType: "image/webp", upsert: false });
-
-        if (uploadError) {
-          console.error("Storage upload failed:", uploadError.message);
-        } else {
-          const { data: signed } = await admin.storage
+          const { error: uploadError } = await admin.storage
             .from("generated-images")
-            .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
-          if (signed?.signedUrl) imageUrl = signed.signedUrl;
+            .upload(storagePath, bytes, { contentType: "image/webp", upsert: false });
+
+          if (uploadError) {
+            console.error("Storage upload failed:", uploadError.message);
+          } else {
+            const { data: signed } = await admin.storage
+              .from("generated-images")
+              .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+            if (signed?.signedUrl) finalImageUrl = signed.signedUrl;
+          }
         }
       } catch (storageErr) {
-        console.error("Storage error, falling back to base64:", storageErr);
+        console.error("Storage error, falling back to direct fal.ai URL:", storageErr);
       }
 
       // ── Record usage ─────────────────────────────────────────────────────────
       await admin.from("usage_logs").insert({ user_id: userId });
     }
 
-    return json({ imageUrl });
+    return json({ imageUrl: finalImageUrl });
   } catch (e) {
     console.error("generate-image unhandled error:", e);
     return json({ error: e instanceof Error ? e.message : "Erro desconhecido." }, 500);

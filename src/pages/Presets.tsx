@@ -1,8 +1,26 @@
 import { Link } from "react-router-dom";
-import { PRESETS } from "@/lib/promptEngine";
+import { PRESETS, STYLES, FORMATS } from "@/lib/promptEngine";
 import { ArrowRight } from "lucide-react";
 
 export default function Presets() {
+  const getStyleLabel = (value: string) => {
+    return STYLES.find((s) => s.value === value)?.label ?? value;
+  };
+
+  const getIntensityLabel = (value: string) => {
+    const intensityMap: Record<string, string> = {
+      baixa: "Intensidade Baixa",
+      media: "Intensidade Média",
+      alta: "Intensidade Alta",
+      maxima: "Urgência Máxima",
+    };
+    return intensityMap[value] ?? value;
+  };
+
+  const getFormatLabel = (value: string) => {
+    return FORMATS.find((f) => f.value === value)?.label ?? value;
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="mb-6 animate-fade-up">
@@ -28,17 +46,17 @@ export default function Presets() {
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {preset.defaults.style && (
                     <span className="inline-block rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
-                      {preset.defaults.style}
+                      {getStyleLabel(preset.defaults.style)}
                     </span>
                   )}
                   {preset.defaults.intensity && (
                     <span className="inline-block rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
-                      {preset.defaults.intensity}
+                      {getIntensityLabel(preset.defaults.intensity)}
                     </span>
                   )}
                   {preset.defaults.format && (
                     <span className="inline-block rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
-                      {preset.defaults.format}
+                      {getFormatLabel(preset.defaults.format)}
                     </span>
                   )}
                 </div>

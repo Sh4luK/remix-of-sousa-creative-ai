@@ -19,7 +19,7 @@ supabase functions serve generate-image
 
 ## Architecture
 
-**Stack:** React 18 + Vite + TypeScript + Tailwind + shadcn/ui (minimal: accordion, button, input, label, textarea, sonner only). Supabase for auth, DB, storage, and edge functions. AI image generation via Lovable AI Gateway (Gemini).
+**Stack:** React 18 + Vite + TypeScript + Tailwind + shadcn/ui (minimal: accordion, button, input, label, textarea, sonner only). Supabase for auth, DB, storage, and edge functions. AI image generation via fal.ai API (Flux).
 
 ### Auth & routing
 
@@ -32,7 +32,7 @@ Routes: `/` Dashboard, `/nova-arte` NewGeneration, `/biblioteca` Library, `/pres
 1. `NewGeneration.tsx` — 3-step wizard (product → price → style). Builds a `GenerationInput` object and calls `buildPrompt()`.
 2. `src/lib/promptEngine.ts` — transforms `GenerationInput` into a structured English prompt for the AI. Also exports `PRESETS`, `FORMATS`, `STYLES`, `CATEGORIES`, `BACKGROUNDS`, `SEALS` constants used across the app.
 3. Client calls `supabase.functions.invoke("generate-image")` with the prompt and optional base64 images.
-4. Edge function (`supabase/functions/generate-image/index.ts`) validates JWT, rate-limits authenticated users (10/24h via `usage_logs` table), calls Lovable AI Gateway, uploads result to the `generated-images` storage bucket, returns a 1-year signed URL.
+4. Edge function (`supabase/functions/generate-image/index.ts`) validates JWT, rate-limits authenticated users (10/24h via `usage_logs` table), calls the fal.ai API (Flux Schnell/Dev), uploads result to the `generated-images` storage bucket, returns a 1-year signed URL.
 5. Client calls `addToLibrary()` to persist the result in the `generations` table.
 
 ### Data persistence

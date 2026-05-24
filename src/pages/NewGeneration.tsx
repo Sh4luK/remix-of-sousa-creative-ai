@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  buildPrompt, FORMATS, PRESETS, type GenerationInput,
+  buildPrompt, FORMATS, STYLES, PRESETS, type GenerationInput,
 } from "@/lib/promptEngine";
 import { addToLibrary } from "@/lib/generationStore";
 import { VoiceMagicButton } from "@/components/VoiceMagicButton";
@@ -42,39 +42,7 @@ type ProductPick =
   | { kind: "upload"; name: string; previewUrl: string; base64: string }
   | { kind: "custom"; name: string };
 
-// Cards visuais de estilo — agora com prévia de gradiente (mock visual do encarte)
-const STYLE_CARDS = [
-  {
-    id: "promocional-popular", icon: "🔥", title: "Oferta Popular",
-    desc: "Cores fortes e chamativas",
-    preview: "linear-gradient(135deg,#fb923c 0%,#dc2626 60%,#facc15 100%)",
-  },
-  {
-    id: "premium-varejo", icon: "✨", title: "Premium Clean",
-    desc: "Elegante e sofisticado",
-    preview: "linear-gradient(135deg,#0f172a 0%,#475569 60%,#cbd5e1 100%)",
-  },
-  {
-    id: "atacarejo-forte", icon: "📦", title: "Atacarejo",
-    desc: "Volume e economia",
-    preview: "linear-gradient(135deg,#1e3a8a 0%,#2563eb 60%,#facc15 100%)",
-  },
-  {
-    id: "bebidas-geladas", icon: "🧊", title: "Bebidas Geladas",
-    desc: "Frio e refrescante",
-    preview: "linear-gradient(135deg,#0ea5e9 0%,#22d3ee 60%,#e0f2fe 100%)",
-  },
-  {
-    id: "acougue-realista", icon: "🥩", title: "Açougue",
-    desc: "Fresco e profissional",
-    preview: "linear-gradient(135deg,#7f1d1d 0%,#dc2626 60%,#fca5a5 100%)",
-  },
-  {
-    id: "clean-moderno", icon: "🛍️", title: "Clean Moderno",
-    desc: "Organizado e limpo",
-    preview: "linear-gradient(135deg,#f8fafc 0%,#e2e8f0 60%,#94a3b8 100%)",
-  },
-] as const;
+// Visual styles are now unified and imported from promptEngine.ts
 
 // Mensagens rotativas do loading (3s cada)
 const LOADING_MESSAGES = [
@@ -145,6 +113,7 @@ export default function NewGeneration() {
 
   // Etapa 3
   const [styleId, setStyleId] = useState<string>("promocional-popular");
+  const [formatId, setFormatId] = useState<string>("1:1");
 
   // Loading + Resultado
   const [loading, setLoading] = useState(false);
@@ -159,7 +128,12 @@ export default function NewGeneration() {
       const preset = PRESETS.find((p) => p.id === presetId);
       if (preset?.defaults.style) {
         setStyleId(preset.defaults.style);
-        toast.success(`Estilo "${preset.name}" pré-selecionado`);
+      }
+      if (preset?.defaults.format) {
+        setFormatId(preset.defaults.format);
+      }
+      if (preset) {
+        toast.success(`Modelo "${preset.name}" pré-selecionado`);
       }
     }
   }, [searchParams]);
@@ -277,6 +251,8 @@ export default function NewGeneration() {
     let brandPrimaryColor = "";
     let brandSecondaryColor = "";
     let brandSignature = "";
+    let brandName = "";
+    let brandLogoUrl = "";
     try {
       const brandRaw = localStorage.getItem("sousa-creative-brand");
       if (brandRaw) {
@@ -284,12 +260,15 @@ export default function NewGeneration() {
         brandPrimaryColor = brand.colors?.[0] ?? "";
         brandSecondaryColor = brand.colors?.[1] ?? "";
         brandSignature = brand.signature ?? "";
+        brandName = brand.name ?? "";
+        brandLogoUrl = brand.logoUrl ?? "";
       }
     } catch { /* use defaults */ }
 
     const input: GenerationInput = {
       productName: pick.name,
       brand: "",
+      brandName: brandName || "Comercial Sousa",
       category: pick.kind === "catalog" ? pick.category : "outros",
       price: currentPrice,
       previousPrice,
@@ -297,7 +276,7 @@ export default function NewGeneration() {
       quantity,
       promoText: "",
       seal: discountSeal,
-      format: "1:1",
+      format: formatId,
       style: styleId,
       background: styleId === "bebidas-geladas" ? "freezer" : "estudio-clean",
       primaryColors: brandPrimaryColor,
@@ -315,14 +294,14 @@ export default function NewGeneration() {
     };
 
     const prompt = buildPrompt(input);
-    const fmt = FORMATS[0];
+    const fmt = FORMATS.find((f) => f.value === formatId) || FORMATS[0];
 
     try {
       const body: any = { prompt, width: fmt.width, height: fmt.height };
       if (input.productImageBase64) body.productImage = input.productImageBase64;
 
       try {
-        const logoResp = await fetch("/logo-comercial-sousa.png");
+        const logoResp = await fetch(brandLogoUrl || "/logo-comercial-sousa.png");
         const logoBlob = await logoResp.blob();
         body.logoImage = await new Promise<string>((resolve) => {
           const r = new FileReader();
@@ -350,7 +329,7 @@ export default function NewGeneration() {
           productName: pick.name,
           category: input.category,
           style: styleId,
-          format: "1:1",
+          format: formatId,
         });
       } catch { /* non-critical — generation succeeded */ }
       toast.success("Encarte gerado com sucesso!");
@@ -408,9 +387,9 @@ export default function NewGeneration() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 px-8 py-12 max-w-md w-full text-center animate-scale-in">
           <div className="relative h-24 w-24 mx-auto mb-6">
-            <div className="absolute inset-0 rounded-full border-4 border-orange-100" />
-            <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin" />
-            <Sparkles className="absolute inset-0 m-auto h-9 w-9 text-orange-500" />
+            <div className="absolute inset-0 rounded-full border-4 border-sky-100" />
+            <div className="absolute inset-0 rounded-full border-4 border-sky-600 border-t-transparent animate-spin" />
+            <Sparkles className="absolute inset-0 m-auto h-9 w-9 text-sky-600" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">Gerando seu encarte</h2>
           <p key={loadingMsgIdx} className="text-base text-slate-600 animate-fade-up min-h-[24px]">
@@ -420,12 +399,12 @@ export default function NewGeneration() {
           {/* Barra de progresso */}
           <div className="mt-6 h-2 w-full bg-slate-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
+              className="h-full bg-gradient-to-r from-sky-600 to-teal-500 transition-all duration-500"
               style={{ width: `${loadingProgress}%` }}
             />
           </div>
           <p className="text-xs text-slate-400 mt-4">
-            ⏳ Pode levar até 20 segundos. Não feche esta tela.
+            ⏳ Pode levar até 20 segundos. Deixe esta tela aberta.
           </p>
         </div>
       </div>
@@ -547,7 +526,12 @@ export default function NewGeneration() {
           )}
 
           {step === 3 && (
-            <Step3 styleId={styleId} setStyleId={setStyleId} />
+            <Step3
+              styleId={styleId}
+              setStyleId={setStyleId}
+              formatId={formatId}
+              setFormatId={setFormatId}
+            />
           )}
 
           {/* Navegação desktop (dentro do card) */}
@@ -560,7 +544,7 @@ export default function NewGeneration() {
               <Button
                 onClick={goNext}
                 size="lg"
-                className="h-12 px-6 bg-orange-500 hover:bg-orange-600 text-white"
+                className="h-12 px-6 bg-sky-600 hover:bg-sky-700 text-white"
               >
                 Continuar <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
@@ -568,7 +552,7 @@ export default function NewGeneration() {
               <Button
                 onClick={handleGenerate}
                 size="lg"
-                className="h-12 px-6 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold shadow-md"
+                className="h-12 px-6 bg-gradient-to-r from-sky-600 to-teal-500 hover:from-sky-700 hover:to-teal-600 text-white font-semibold shadow-md"
               >
                 <Sparkles className="h-5 w-5 mr-2" /> Gerar Encarte com IA
               </Button>
@@ -585,14 +569,14 @@ export default function NewGeneration() {
         {step < 3 ? (
           <Button
             onClick={goNext}
-            className="flex-1 h-12 bg-orange-500 hover:bg-orange-600 text-white text-base font-semibold"
+            className="flex-1 h-12 bg-sky-600 hover:bg-sky-700 text-white text-base font-semibold"
           >
             Continuar <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         ) : (
           <Button
             onClick={handleGenerate}
-            className="flex-1 h-12 bg-gradient-to-r from-orange-500 to-red-500 text-white text-base font-semibold"
+            className="flex-1 h-12 bg-gradient-to-r from-sky-600 to-teal-500 text-white text-base font-semibold"
           >
             <Sparkles className="h-5 w-5 mr-2" /> Gerar Encarte
           </Button>
@@ -607,8 +591,8 @@ export default function NewGeneration() {
 // ──────────────────────────────────────────────────────────────
 function TipBar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
-      <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-sky-50 border border-sky-200 text-sky-900">
+      <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 text-sky-600" />
       <p className="text-xs sm:text-sm leading-relaxed">{children}</p>
     </div>
   );
@@ -635,7 +619,7 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
                 className={[
                   "h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold transition",
                   isDone ? "bg-emerald-500 text-white" :
-                  isActive ? "bg-orange-500 text-white shadow-md shadow-orange-200" : "bg-slate-200 text-slate-500",
+                  isActive ? "bg-sky-500 text-white shadow-md shadow-sky-200" : "bg-slate-200 text-slate-500",
                 ].join(" ")}
               >
                 {isDone ? <Check className="h-4 w-4" /> : s.n}
@@ -687,10 +671,10 @@ function Step1({
 
       {/* Pré-visualização editável do que a voz capturou */}
       {(pick?.kind === "custom" || currentPrice) && (
-        <div className="rounded-2xl border-2 border-orange-200 bg-orange-50/60 p-4 sm:p-5 space-y-3">
+        <div className="rounded-2xl border-2 border-sky-200 bg-sky-50/60 p-4 sm:p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <Check className="h-4 w-4 text-orange-600" />
-            <p className="text-sm font-semibold text-orange-900">
+            <Check className="h-4 w-4 text-sky-700" />
+            <p className="text-sm font-semibold text-sky-900">
               Confira o que entendemos. Pode editar antes de continuar.
             </p>
           </div>
@@ -710,7 +694,7 @@ function Step1({
                 }}
                 readOnly={pick != null && pick.kind !== "custom"}
                 placeholder="Ex: Cerveja Heineken"
-                className="h-12 rounded-xl border-orange-200 bg-white focus-visible:ring-orange-400"
+                className="h-12 rounded-xl border-sky-200 bg-white focus-visible:ring-sky-500"
               />
             </div>
             <div>
@@ -722,7 +706,7 @@ function Step1({
                 onChange={(e) => setCurrentPrice(e.target.value)}
                 placeholder="R$ 0,00"
                 inputMode="decimal"
-                className="h-12 rounded-xl border-orange-200 bg-white focus-visible:ring-orange-400 font-semibold"
+                className="h-12 rounded-xl border-sky-200 bg-white focus-visible:ring-sky-500 font-semibold"
               />
             </div>
           </div>
@@ -748,7 +732,7 @@ function Step1({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Ex: arroz, refrigerante, café..."
-          className="h-14 pl-12 text-base rounded-xl border-slate-200 focus-visible:ring-orange-400"
+          className="h-14 pl-12 text-base rounded-xl border-slate-200 focus-visible:ring-sky-500"
         />
       </div>
 
@@ -761,7 +745,7 @@ function Step1({
               <button
                 key={s}
                 onClick={() => setSearch(s)}
-                className="px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-orange-100 text-sm text-slate-700 hover:text-orange-700 font-medium transition"
+                className="px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-sky-100 text-sm text-slate-700 hover:text-sky-800 font-medium transition"
               >
                 {s}
               </button>
@@ -792,8 +776,8 @@ function Step1({
                   className={[
                     "w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition",
                     selected
-                      ? "border-orange-500 bg-orange-50 shadow-sm"
-                      : "border-slate-200 hover:border-orange-300 bg-white",
+                      ? "border-sky-600 bg-sky-50 shadow-sm"
+                      : "border-slate-200 hover:border-sky-300 bg-white",
                   ].join(" ")}
                 >
                   <div className="h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center text-2xl">
@@ -804,7 +788,7 @@ function Step1({
                     <div className="text-xs text-slate-500 capitalize">{p.category}</div>
                   </div>
                   {selected && (
-                    <div className="h-7 w-7 rounded-full bg-orange-500 text-white flex items-center justify-center">
+                    <div className="h-7 w-7 rounded-full bg-sky-500 text-white flex items-center justify-center">
                       <Check className="h-4 w-4" />
                     </div>
                   )}
@@ -816,10 +800,10 @@ function Step1({
       )}
 
       {/* Card de fallback */}
-      <div className="rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/50 p-5">
+      <div className="rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50/50 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-            <Upload className="h-5 w-5 text-orange-600" />
+          <div className="h-12 w-12 rounded-full bg-sky-100 flex items-center justify-center shrink-0">
+            <Upload className="h-5 w-5 text-sky-700" />
           </div>
           <div className="flex-1">
             <p className="font-semibold text-slate-900">Não encontrou na lista?</p>
@@ -837,14 +821,14 @@ function Step1({
           />
           <Button
             onClick={() => uploadRef.current?.click()}
-            className="bg-orange-500 hover:bg-orange-600 text-white h-11"
+            className="bg-sky-600 hover:bg-sky-700 text-white h-11"
           >
             <Upload className="h-4 w-4 mr-2" /> Enviar foto
           </Button>
         </div>
 
         {pick?.kind === "upload" && (
-          <div className="mt-4 flex items-center gap-3 p-3 bg-white rounded-lg border border-orange-200">
+          <div className="mt-4 flex items-center gap-3 p-3 bg-white rounded-lg border border-sky-200">
             <img src={pick.previewUrl} alt={pick.name} className="h-14 w-14 rounded-lg object-cover" />
             <div className="flex-1 text-sm">
               <div className="font-medium text-slate-900">{pick.name}</div>
@@ -895,14 +879,14 @@ function Step2({
 
       {/* Confirmação do preço inferido pelo áudio */}
       {voicePrice && (
-        <div className="rounded-2xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50 p-4 sm:p-5 shadow-sm animate-fade-up">
+        <div className="rounded-2xl border-2 border-sky-300 bg-gradient-to-br from-sky-50 to-teal-50 p-4 sm:p-5 shadow-sm animate-fade-up">
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-full bg-sky-100 flex items-center justify-center shrink-0">
               <span className="text-lg">🎤</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-900">
-                Entendi pelo seu áudio: <span className="text-orange-600">{voicePrice}</span>
+                Entendi pelo seu áudio: <span className="text-sky-700">{voicePrice}</span>
               </p>
               <p className="text-xs text-slate-600 mt-0.5">
                 O preço está certo? Confirme para avançar ou corrija no campo abaixo.
@@ -910,14 +894,14 @@ function Step2({
               <div className="flex flex-wrap gap-2 mt-3">
                 <Button
                   onClick={onConfirmVoicePrice}
-                  className="bg-orange-500 hover:bg-orange-600 text-white h-10"
+                  className="bg-sky-600 hover:bg-sky-700 text-white h-10"
                 >
                   <Check className="h-4 w-4 mr-1.5" /> Sim, está certo
                 </Button>
                 <Button
                   onClick={onRejectVoicePrice}
                   variant="outline"
-                  className="h-10 border-orange-200 text-orange-700 hover:bg-orange-100"
+                  className="h-10 border-sky-200 text-sky-800 hover:bg-sky-100"
                 >
                   Corrigir preço
                 </Button>
@@ -953,7 +937,7 @@ function Step2({
       <div className="space-y-4">
         <div>
           <Label className="text-sm font-medium text-slate-700">
-            Preço Atual <span className="text-orange-500">*</span>
+            Preço Atual <span className="text-sky-600">*</span>
           </Label>
           <Input
             value={currentPrice}
@@ -994,7 +978,7 @@ function Step2({
       <div className="border-t border-slate-100 pt-4">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-2 text-sm font-medium text-orange-600 hover:text-orange-700"
+          className="flex items-center gap-2 text-sm font-medium text-sky-700 hover:text-sky-800"
         >
           {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           {showAdvanced ? "Ocultar" : "Ver"} Opções Avançadas
@@ -1028,53 +1012,99 @@ function Step2({
 }
 
 // ──────────────────────────────────────────────────────────────
-// ETAPA 3 – Estilo Visual
+// ETAPA 3 – Estilo Visual & Formato
 // ──────────────────────────────────────────────────────────────
-function Step3({ styleId, setStyleId }: { styleId: string; setStyleId: (v: string) => void }) {
+function Step3({
+  styleId,
+  setStyleId,
+  formatId,
+  setFormatId,
+}: {
+  styleId: string;
+  setStyleId: (v: string) => void;
+  formatId: string;
+  setFormatId: (v: string) => void;
+}) {
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Como você quer que fique?</h2>
-        <p className="text-sm text-slate-500 mt-1">Toque no estilo que mais combina com sua oferta.</p>
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Como você quer que fique?</h2>
+          <p className="text-sm text-slate-500 mt-1">Toque no visual que mais combina com sua oferta.</p>
+        </div>
+
+        <TipBar>
+          Cada estilo tem um clima diferente. Não precisa acertar de primeira — você pode gerar quantas variações quiser.
+        </TipBar>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {STYLES.map((card) => {
+            const selected = styleId === card.value;
+            return (
+              <button
+                key={card.value}
+                onClick={() => setStyleId(card.value)}
+                className={[
+                  "relative rounded-2xl border-2 overflow-hidden text-left transition-all",
+                  selected
+                    ? "border-sky-600 shadow-md scale-[1.02]"
+                    : "border-slate-200 hover:border-sky-300 hover:shadow-sm",
+                ].join(" ")}
+              >
+                <div
+                  className="h-20 w-full relative flex items-center justify-center"
+                  style={{ background: card.preview }}
+                >
+                  <span className="text-3xl drop-shadow-sm">{card.icon}</span>
+                </div>
+                <div className="p-3 bg-white">
+                  <div className="font-semibold text-slate-900 text-sm leading-tight">{card.label}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{card.desc}</div>
+                </div>
+                {selected && (
+                  <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-md">
+                    <Check className="h-3.5 w-3.5" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <TipBar>
-        Cada estilo tem um clima diferente. Não precisa acertar de primeira — você pode gerar quantas variações quiser.
-      </TipBar>
+      <div className="border-t border-slate-100 pt-5 space-y-4">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Onde você vai postar?</h2>
+          <p className="text-sm text-slate-500 mt-1">Cada rede social tem um tamanho ideal — escolha aqui.</p>
+        </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {STYLE_CARDS.map((card) => {
-          const selected = styleId === card.id;
-          return (
-            <button
-              key={card.id}
-              onClick={() => setStyleId(card.id)}
-              className={[
-                "relative rounded-2xl border-2 overflow-hidden text-left transition-all",
-                selected
-                  ? "border-orange-500 shadow-md scale-[1.02]"
-                  : "border-slate-200 hover:border-orange-300 hover:shadow-sm",
-              ].join(" ")}
-            >
-              {/* Preview visual (mini-encarte mock) */}
-              <div
-                className="h-20 w-full relative flex items-center justify-center"
-                style={{ background: card.preview }}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {FORMATS.map((f) => {
+            const selected = formatId === f.value;
+            return (
+              <button
+                key={f.value}
+                onClick={() => setFormatId(f.value)}
+                className={[
+                  "w-full flex items-center justify-between p-4 rounded-xl border-2 text-left transition",
+                  selected
+                    ? "border-sky-600 bg-sky-50/60 shadow-sm font-semibold"
+                    : "border-slate-200 hover:border-sky-300 bg-white",
+                ].join(" ")}
               >
-                <span className="text-3xl drop-shadow-sm">{card.icon}</span>
-              </div>
-              <div className="p-3 bg-white">
-                <div className="font-semibold text-slate-900 text-sm leading-tight">{card.title}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{card.desc}</div>
-              </div>
-              {selected && (
-                <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-md">
-                  <Check className="h-3.5 w-3.5" />
+                <div>
+                  <div className="text-sm font-medium text-slate-900">{f.label}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{f.width} × {f.height} px</div>
                 </div>
-              )}
-            </button>
-          );
-        })}
+                {selected && (
+                  <div className="h-6 w-6 rounded-full bg-sky-500 text-white flex items-center justify-center">
+                    <Check className="h-3.5 w-3.5" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

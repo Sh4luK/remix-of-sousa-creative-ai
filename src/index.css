@@ -15,35 +15,35 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 25% 10%;
 
-    --primary: 4 80% 50%;
+    --primary: 200 98% 39%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 25% 10%;
+    --secondary: 215 16% 95%;
+    --secondary-foreground: 215 25% 12%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 10% 46%;
+    --muted: 215 16% 95%;
+    --muted-foreground: 215 12% 42%;
 
-    --accent: 42 100% 50%;
-    --accent-foreground: 220 25% 10%;
+    --accent: 174 72% 38%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 75% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 4 80% 50%;
+    --border: 215 16% 90%;
+    --input: 215 16% 90%;
+    --ring: 200 98% 39%;
 
     --radius: 0.625rem;
 
-    --sidebar-background: 220 25% 10%;
-    --sidebar-foreground: 220 14% 80%;
-    --sidebar-primary: 4 80% 50%;
+    --sidebar-background: 215 32% 13%;
+    --sidebar-foreground: 215 16% 82%;
+    --sidebar-primary: 200 98% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 20% 16%;
-    --sidebar-accent-foreground: 220 14% 80%;
-    --sidebar-border: 220 20% 18%;
-    --sidebar-ring: 4 80% 50%;
+    --sidebar-accent: 215 28% 19%;
+    --sidebar-accent-foreground: 215 16% 90%;
+    --sidebar-border: 215 28% 20%;
+    --sidebar-ring: 200 98% 45%;
 
     --success: 152 60% 42%;
     --success-foreground: 0 0% 100%;
@@ -61,7 +61,7 @@
 
 @layer utilities {
   .promo-gradient {
-    background: linear-gradient(135deg, hsl(4 80% 50%), hsl(42 100% 50%));
+    background: linear-gradient(135deg, hsl(200 98% 39%), hsl(174 72% 38%));
   }
   .text-balance {
     text-wrap: balance;
