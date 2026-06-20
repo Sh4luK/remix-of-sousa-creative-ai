@@ -1,0 +1,15 @@
+Django>=5.1,<5.3
+djangorestframework>=3.15,<3.16
+django-cors-headers>=4.4,<5
+django-environ>=0.11,<1
+dj-database-url>=2.3,<3
+psycopg[binary]>=3.2,<4
+django-allauth>=64,<66
+dj-rest-auth>=7,<8
+djangorestframework-simplejwt>=5.3,<6
+Pillow>=11,<12
+requests>=2.32,<3
+django-cleanup>=8,<10
+gunicorn>=23,<24
+whitenoise>=6.7,<7
+sentry-sdk>=2,<3
