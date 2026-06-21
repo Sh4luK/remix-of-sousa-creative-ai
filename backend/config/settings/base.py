@@ -139,6 +139,11 @@ SIMPLE_JWT = {
 # --- Turnstile ---
 TURNSTILE_SECRET_KEY = env("TURNSTILE_SECRET_KEY", default="")
 
+# --- Stability AI ---
+STABILITY_KEY = env("STABILITY_KEY", default="")
+STABILITY_MODEL = env("STABILITY_MODEL", default="core")
+STABILITY_SD3_MODEL = env("STABILITY_SD3_MODEL", default="sd3.5-large")
+
 # --- dj-rest-auth ---
 REST_AUTH = {
     "USE_JWT": True,
@@ -154,3 +159,17 @@ ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_EMAIL_VERIFICATION = "none"  # set to "mandatory" when SMTP is configured
 
 CORS_ALLOW_ALL_ORIGINS = False
+
+# --- Sentry (opcional; desligado se SENTRY_DSN vazio) ---
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
+        environment=env("SENTRY_ENVIRONMENT", default="production"),
+        send_default_pii=False,
+    )

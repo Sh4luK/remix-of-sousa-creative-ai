@@ -26,8 +26,8 @@ export default function Library() {
     return true;
   });
 
-  const handleToggleFav = async (id: string) => {
-    await toggleFavorite(id);
+  const handleToggleFav = async (id: string, next: boolean) => {
+    await toggleFavorite(id, next);
     refresh();
   };
 
@@ -107,7 +107,7 @@ export default function Library() {
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   aria-label="Favoritar"
-                  onClick={(e) => { e.stopPropagation(); handleToggleFav(img.id); }}
+                  onClick={(e) => { e.stopPropagation(); handleToggleFav(img.id, !img.favorite); }}
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-card/90 backdrop-blur transition-colors hover:bg-card"
                 >
                   <Heart className={`h-3.5 w-3.5 ${img.favorite ? "fill-primary text-primary" : "text-foreground"}`} />

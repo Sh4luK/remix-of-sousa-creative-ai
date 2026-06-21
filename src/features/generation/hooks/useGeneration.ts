@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api, authedImageUrl } from "@/lib/api";
 import { buildPrompt, FORMATS, type GenerationInput } from "@/lib/promptEngine";
-import { FunctionsHttpError } from "@supabase/supabase-js";
 import type { ProductPick, GeneratedImage } from "@/types/database.types";
 import { toast } from "sonner";
 
@@ -138,36 +137,19 @@ export function useGeneration() {
         }
       }
 
-      const { data, error: invokeError } = await supabase.functions.invoke("generate-image", { body });
-      
-      if (invokeError) {
-        if (invokeError instanceof FunctionsHttpError) {
-          const status = invokeError.status;
-          if (status === 402) {
-            throw new Error("Créditos insuficientes para gerar a arte.");
-          }
-          if (status === 429) {
-            throw new Error("Muitas tentativas simultâneas. Aguarde alguns segundos.");
-          }
-        }
-        throw invokeError;
-      }
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
+      const data = await api.post<{ imageUrl: string; generation: GeneratedImage }>("/generations/", body);
       if (!data?.imageUrl) {
         throw new Error("A IA falhou em retornar uma URL de imagem.");
       }
 
       setLoadingProgress(100);
-      setResult(data.imageUrl);
+      const imageUrl = await authedImageUrl(data.imageUrl);
+      setResult(imageUrl);
       toast.success("Encarte gerado com sucesso!");
 
-      const returnedGen: GeneratedImage = (data.generation as GeneratedImage) || {
+      return data.generation ?? {
         id: crypto.randomUUID(),
-        imageUrl: data.imageUrl,
+        imageUrl,
         prompt,
         productName: pick.name,
         category: input.category,
@@ -176,8 +158,6 @@ export function useGeneration() {
         createdAt: new Date().toISOString(),
         favorite: false,
       };
-
-      return returnedGen;
     } catch (err) {
       console.error(err);
       const errMsg = err instanceof Error ? err.message : "Não foi possível gerar o encarte.";

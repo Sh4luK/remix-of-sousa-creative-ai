@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api, authedImageUrl } from "@/lib/api";
 import {
   buildPrompt, FORMATS, STYLES, PRESETS, type GenerationInput,
 } from "@/lib/promptEngine";
-import { addToLibrary } from "@/lib/generationStore";
+import type { GeneratedImage } from "@/lib/generationStore";
 import { getUserProducts, saveProduct, uploadProductImage, type Product } from "@/lib/productStore";
 import { searchOFF, type OFFProduct } from "@/lib/openFoodFacts";
 import { VoiceMagicButton } from "@/components/VoiceMagicButton";
@@ -181,12 +181,11 @@ export default function NewGeneration() {
       setPick({ kind: "upload", name, previewUrl: base64, base64 });
       toast.success("Foto carregada!");
 
-      // Background: salva no catálogo para uso futuro
+      // Background: salva no catálogo para uso futuro (upload já cria o produto)
       (async () => {
         try {
           const webpFile = await dataUrlToFile(base64, "product.webp");
-          const { storagePath } = await uploadProductImage(webpFile);
-          await saveProduct({ name, category: "outros", storagePath, source: "user" });
+          await uploadProductImage(webpFile, name);
           // Refresh da lista (silencioso)
           getUserProducts().then(setUserMatches).catch(() => {});
         } catch { /* não-crítico */ }
@@ -307,7 +306,15 @@ export default function NewGeneration() {
     const fmt = FORMATS.find((f) => f.value === formatId) || FORMATS[0];
 
     try {
-      const body: Record<string, unknown> = { prompt, width: fmt.width, height: fmt.height };
+      const body: Record<string, unknown> = {
+        prompt,
+        width: fmt.width,
+        height: fmt.height,
+        productName: pick.name,
+        category: input.category,
+        style: styleId,
+        format: formatId,
+      };
       if (productImageBase64) body.productImage = productImageBase64;
 
       try {
@@ -320,28 +327,11 @@ export default function NewGeneration() {
         });
       } catch { /* logo opcional */ }
 
-      const { data, error } = await supabase.functions.invoke("generate-image", { body });
-      if (error) {
-        const ctx = (error as { context?: { status?: number } })?.context;
-        if (ctx?.status === 402) throw new Error("Créditos insuficientes para gerar a arte.");
-        if (ctx?.status === 429) throw new Error("Muitas tentativas. Aguarde alguns segundos.");
-        throw error;
-      }
-      if (data?.error) throw new Error(data.error as string);
+      const data = await api.post<{ imageUrl: string; generation: GeneratedImage }>("/generations/", body);
       if (!data?.imageUrl) throw new Error("A IA não retornou uma imagem.");
 
       setLoadingProgress(100);
-      setResult(data.imageUrl as string);
-
-      // Edge function saves for authenticated users; only fall back client-side for guests
-      if (!data.generation) {
-        try {
-          await addToLibrary({ imageUrl: data.imageUrl as string, prompt, productName: pick.name, category: input.category, style: styleId, format: formatId });
-        } catch (saveErr) {
-          console.warn("Library save failed:", saveErr);
-        }
-      }
-
+      setResult(await authedImageUrl(data.imageUrl));
       toast.success("Encarte gerado com sucesso!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível gerar o encarte.");
@@ -517,7 +507,6 @@ export default function NewGeneration() {
   );
 }
 
-// ── Stepper ───────────────────────────────────────────────────
 function Stepper({ step }: { step: 1 | 2 | 3 }) {
   const steps = [{ n: 1, label: "Produto" }, { n: 2, label: "Preço" }, { n: 3, label: "Estilo" }];
   return (

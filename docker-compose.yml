@@ -1,24 +1,44 @@
 services:
-  # Serviço para Desenvolvimento Local com Hot-Reload (Vite HMR)
-  web-dev:
+  # Django REST API
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pj-midia-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.dev
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    restart: unless-stopped
+
+  # Vite React frontend (dev com hot-reload)
+  web:
     build:
       context: .
       target: base
-    container_name: pj-midia-dev
+    container_name: pj-midia-web
     ports:
-      - "3000:8080"
+      - "5173:8080"
     volumes:
       - .:/app
-      - /app/node_modules # Evita sobrescrever o node_modules do container pelo local
+      - /app/node_modules
     env_file:
       - .env
     environment:
       - NODE_ENV=development
-      - WATCHPACK_POLLING=true # Otimiza o watch de arquivos em sistemas virtuais ou Windows/WSL
+      - VITE_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true
     stdin_open: true
     tty: true
 
-  # Serviço para Simular o Ambiente de Produção com Nginx
+  # Simulação de produção com Nginx
   web-prod:
     build:
       context: .

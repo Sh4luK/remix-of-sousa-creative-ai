@@ -12,7 +12,7 @@ import {
   Package,
 } from "lucide-react";
 import logoImg from "@/assets/logo-comercial-sousa.png";
-import { supabase } from "@/integrations/supabase/client";
+import { logout } from "@/lib/api";
 
 const NAV_ITEMS = [
   { to: "/", label: "Início", icon: LayoutDashboard },
@@ -84,7 +84,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <p className="text-xs font-medium text-sidebar-accent-foreground/80">IA Ativada</p>
           </div>
           <button
-            onClick={() => supabase.auth.signOut()}
+            onClick={() => logout()}
             className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
           >
             <LogOut className="h-3.5 w-3.5 shrink-0" />

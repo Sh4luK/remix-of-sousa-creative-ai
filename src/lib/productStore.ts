@@ -1,153 +1,89 @@
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 export interface Product {
   id: string;
   name: string;
   category: string;
-  storagePath?: string;
   offImageUrl?: string;
   barcode?: string;
   source: "user" | "openfoodfacts";
-  displayUrl?: string; // signed URL (user-uploaded) ou offImageUrl (OFF)
+  displayUrl?: string; // imagem (upload em MEDIA ou offImageUrl)
   createdAt: string;
 }
 
 export interface SaveProductInput {
   name: string;
   category: string;
-  storagePath?: string;
   offImageUrl?: string;
   barcode?: string;
   source: "user" | "openfoodfacts";
 }
 
-async function getUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user.id ?? null;
+interface ApiProduct {
+  id: number | string;
+  name: string;
+  category: string;
+  offImageUrl?: string | null;
+  barcode?: string | null;
+  source: "user" | "openfoodfacts";
+  displayUrl?: string | null;
+  createdAt: string;
 }
 
-function fromRow(row: Record<string, unknown>): Product {
+function fromApi(p: ApiProduct): Product {
   return {
-    id: row.id as string,
-    name: row.name as string,
-    category: (row.category as string) ?? "outros",
-    storagePath: (row.storage_path as string) ?? undefined,
-    offImageUrl: (row.off_image_url as string) ?? undefined,
-    barcode: (row.barcode as string) ?? undefined,
-    source: ((row.source as string) === "openfoodfacts" ? "openfoodfacts" : "user"),
-    createdAt: row.created_at as string,
+    id: String(p.id),
+    name: p.name,
+    category: p.category ?? "outros",
+    offImageUrl: p.offImageUrl ?? undefined,
+    barcode: p.barcode ?? undefined,
+    source: p.source === "openfoodfacts" ? "openfoodfacts" : "user",
+    displayUrl: p.displayUrl ?? undefined,
+    createdAt: p.createdAt,
   };
 }
 
-export async function getProductSignedUrl(storagePath: string): Promise<string | null> {
-  const { data } = await supabase.storage
-    .from("product-images")
-    .createSignedUrl(storagePath, 7 * 24 * 3600);
-  return data?.signedUrl ?? null;
-}
-
 export async function getUserProducts(query?: string): Promise<Product[]> {
-  const userId = await getUserId();
-  if (!userId) return [];
-
-  let req = supabase
-    .from("products")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (query?.trim()) {
-    req = req.ilike("name", `%${query.trim()}%`);
+  const params = query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
+  try {
+    const rows = await api.get<ApiProduct[]>(`/products/${params}`);
+    return rows.map(fromApi);
+  } catch {
+    return [];
   }
-
-  const { data } = await req;
-  const products = ((data ?? []) as Record<string, unknown>[]).map(fromRow);
-
-  // Attach display URLs in parallel
-  await Promise.all(
-    products.map(async (p) => {
-      if (p.offImageUrl) {
-        p.displayUrl = p.offImageUrl;
-      } else if (p.storagePath) {
-        p.displayUrl = (await getProductSignedUrl(p.storagePath)) ?? undefined;
-      }
-    })
-  );
-
-  return products;
 }
 
 export async function saveProduct(input: SaveProductInput): Promise<Product | null> {
-  const userId = await getUserId();
-  if (!userId) return null;
-
-  // Avoid exact-name duplicates per user
-  const { data: existing } = await supabase
-    .from("products")
-    .select("id")
-    .eq("user_id", userId)
-    .ilike("name", input.name)
-    .maybeSingle();
-
-  if (existing) return null; // already saved
-
-  const { data, error } = await supabase
-    .from("products")
-    .insert({
-      user_id: userId,
+  try {
+    const p = await api.post<ApiProduct>("/products/", {
       name: input.name,
       category: input.category,
-      storage_path: input.storagePath ?? null,
-      off_image_url: input.offImageUrl ?? null,
-      barcode: input.barcode ?? null,
+      offImageUrl: input.offImageUrl ?? "",
+      barcode: input.barcode ?? "",
       source: input.source,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return fromRow(data as Record<string, unknown>);
+    });
+    return fromApi(p);
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const userId = await getUserId();
-  if (!userId) return;
-
-  const { data } = await supabase
-    .from("products")
-    .select("storage_path")
-    .eq("id", id)
-    .eq("user_id", userId)
-    .single();
-
-  if (data?.storage_path) {
-    await supabase.storage
-      .from("product-images")
-      .remove([data.storage_path as string]);
-  }
-
-  await supabase.from("products").delete().eq("id", id).eq("user_id", userId);
+  await api.del(`/products/${id}/`);
 }
 
 export async function uploadProductImage(
-  file: File
-): Promise<{ storagePath: string; signedUrl: string }> {
-  const userId = await getUserId();
-  if (!userId) throw new Error("Não autenticado");
-
-  const storagePath = `${userId}/${crypto.randomUUID()}.webp`;
-
-  const { error } = await supabase.storage
-    .from("product-images")
-    .upload(storagePath, file, { contentType: "image/webp", upsert: false });
-
-  if (error) throw error;
-
-  const { data: signed } = await supabase.storage
-    .from("product-images")
-    .createSignedUrl(storagePath, 7 * 24 * 3600);
-
-  if (!signed?.signedUrl) throw new Error("Falha ao gerar URL da imagem");
-  return { storagePath, signedUrl: signed.signedUrl };
+  file: File,
+  name = "Produto",
+  category = "outros",
+): Promise<{ id: string; displayUrl: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("name", name);
+  form.append("category", category);
+  const data = await api.postForm<{ id: number | string; displayUrl: string }>(
+    "/products/upload-image/",
+    form,
+  );
+  return { id: String(data.id), displayUrl: data.displayUrl };
 }

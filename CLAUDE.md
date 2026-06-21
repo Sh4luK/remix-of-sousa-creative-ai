@@ -2,8 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Monorepo: **React (Vite) na raiz** consome uma **API REST Django** em `backend/`. O backend Django substituiu o Supabase (auth, DB, storage, edge functions). Detalhes do backend em `backend/CLAUDE.md`; plano e contrato da API em `PLANO_DJANGO.md`.
+
 ## Commands
 
+Frontend (raiz):
 ```bash
 npm run dev          # Vite dev server (localhost:5173)
 npm run build        # Production build
@@ -12,56 +15,62 @@ npm run test         # Vitest (single run)
 npm run test:watch   # Vitest (watch mode)
 ```
 
-Edge function local dev requires the Supabase CLI:
+Stack completo via Docker:
 ```bash
-supabase functions serve generate-image
+docker compose up                              # dev: api (8000) + web/Vite (5173)
+docker compose -f docker-compose.prod.yml up --build   # prod: gunicorn + nginx em http://localhost
+docker compose exec api python manage.py test --settings=config.settings.test
+docker compose exec api python manage.py migrate
+docker compose exec api python manage.py createsuperuser
 ```
 
 ## Architecture
 
-**Stack:** React 18 + Vite + TypeScript + Tailwind + shadcn/ui (minimal: accordion, button, input, label, textarea, sonner only). Supabase for auth, DB, storage, and edge functions. AI image generation via fal.ai API (Flux).
+**Frontend:** React 18 + Vite + TypeScript + Tailwind + shadcn/ui (mínimo: accordion, button, input, label, textarea, sonner). **Backend:** Django 5 + DRF + dj-rest-auth/allauth (JWT), Postgres (Supabase via Session Pooler), storage em disco (`MEDIA_ROOT`). Geração de imagem via Stability AI (Stable Image: `core` para text-to-image, `sd3.5-large` para image-to-image). **Geração exige login** (sem modo anônimo).
+
+### Camada de dados (frontend)
+
+`src/lib/api.ts` é o **único** wrapper de rede: `fetch` sobre a API REST, base `VITE_API_URL + /api` (vazio = mesma origem via nginx em prod). Injeta `Authorization: Bearer`, faz refresh de JWT single-flight no 401, emite o evento `pj-auth-change`. Tokens em `localStorage` (`pj-midia-access` / `pj-midia-refresh`). `authedImageUrl()` busca o blob autenticado da imagem de geração (privada, `<img src>` não manda header) e cacheia o object URL.
+
+Stores que consomem a API: `generationStore.ts`, `productStore.ts`, `openFoodFacts.ts`, `BrandSettings.tsx`, `useAuth.ts`.
 
 ### Auth & routing
 
-`App.tsx` wraps all protected routes in `<ProtectedRoutes>` which reads `useAuth` (`src/hooks/useAuth.ts`) and redirects to `/login` if no session. `AppLayout` wraps all authenticated pages with sidebar nav.
+`App.tsx` envolve as rotas protegidas em `<ProtectedRoutes>`, que lê `useAuth` (`src/hooks/useAuth.ts`, consome `/api/auth/user/`) e redireciona para `/login` sem sessão. `AppLayout` envolve as páginas autenticadas com a sidebar.
 
-Routes: `/` Dashboard, `/nova-arte` NewGeneration, `/biblioteca` Library, `/presets` Presets, `/marca` BrandSettings, `/configuracoes` SettingsPage.
+Rotas: `/` Dashboard, `/nova-arte` NewGeneration, `/biblioteca` Library, `/presets` Presets, `/marca` BrandSettings, `/configuracoes` SettingsPage. Login/registro em `Login.tsx` (envia `turnstile_token`; Google é stub).
 
 ### Image generation flow
 
-1. `NewGeneration.tsx` — 3-step wizard (product → price → style). Builds a `GenerationInput` object and calls `buildPrompt()`.
-2. `src/lib/promptEngine.ts` — transforms `GenerationInput` into a structured English prompt for the AI. Also exports `PRESETS`, `FORMATS`, `STYLES`, `CATEGORIES`, `BACKGROUNDS`, `SEALS` constants used across the app.
-3. Client calls `supabase.functions.invoke("generate-image")` with the prompt and optional base64 images.
-4. Edge function (`supabase/functions/generate-image/index.ts`) validates JWT, rate-limits authenticated users (10/24h via `usage_logs` table), calls the fal.ai API (Flux Schnell/Dev), uploads result to the `generated-images` storage bucket, returns a 1-year signed URL.
-5. Client calls `addToLibrary()` to persist the result in the `generations` table.
+1. `NewGeneration.tsx` — wizard de 3 passos (produto → preço → estilo). Monta `GenerationInput` e chama `buildPrompt()`.
+2. `src/lib/promptEngine.ts` — transforma `GenerationInput` num prompt estruturado em inglês. **`buildPrompt()` roda no cliente** (não foi portado pro Python). Exporta também `PRESETS`, `FORMATS`, `STYLES`, `CATEGORIES`, `BACKGROUNDS`, `SEALS`.
+3. `useGeneration.ts` chama `api.post("/generations/", body)` com `prompt`, `width/height`, `productName/category/style/format` e, se houver, `productImage`/`logoImage` (base64).
+4. Backend `POST /api/generations/` (`backend/apps/generations/`): `IsAuthenticated` → `usage.consume()` (quota atômica 10/24h, `select_for_update`) → valida imagens por magic bytes + Pillow → `services.generate()` chama Stability (multipart; `aspect_ratio` derivado de width/height; trata 429/402/403 e `finish-reason: CONTENT_FILTERED`) → salva webp no `ImageField` → cria `Generation` → retorna `{imageUrl, generation}`. A `imageUrl` aponta para `/api/generations/<id>/image/`.
+5. `authedImageUrl()` busca o blob protegido e exibe.
 
 ### Data persistence
 
-`src/lib/generationStore.ts` is the single abstraction for image history. It auto-detects auth state:
-- **Authenticated:** reads/writes Supabase `generations` table (limit 20, no pagination).
-- **Guest:** falls back to `localStorage` under key `sousa-creative-library-guest` (max 3 items).
+Tudo no Postgres via Django ORM, **ownership por `get_queryset().filter(user=request.user)`** (sem RLS). Models em `backend/apps/*/models.py`:
+- `Generation` — colunas explícitas (`prompt`, `image`, `product_name`, `category`, `style`, `format`, `favorite`, `created_at`). Listagem paginada por **cursor** (`created_at`). `favorite` é coluna real (PATCH).
+- `Brand` — OneToOne com User (`name`, `slogan`, `colors`, `default_phrase`, `button_text`, `signature`, `logo`). Espelhado em `localStorage` (`pj-midia-brand`) só para o `buildPrompt()` injetar cores/assinatura no cliente.
+- `Product` — catálogo do usuário (`name`, `category`, `image`, `off_image_url`, `barcode`, `source`).
+- `UsageQuota` — 1 linha/usuário (`window_start`, `count`) para o rate limit.
 
-`favorite` is stored inside the `generations.metadata` JSONB column, not a dedicated column.
+Storage: `MEDIA_ROOT` em disco. **Gerações são privadas** (servidas pela view autenticada `GenerationImageView`, só pro dono → 404 pra outro). `product-images`/`brand-logos` são públicas via `/media/` (dev: Django; prod: nginx). `django-cleanup` apaga o arquivo ao deletar a linha.
 
-### Brand config
+### Serializers (contrato com o frontend)
 
-`BrandSettings.tsx` saves brand config to `localStorage` under key `sousa-creative-brand`. `NewGeneration.tsx` reads this directly at generation time to inject brand colors and signature into the prompt. Not synced to Supabase.
+Serializers emitem **camelCase** (via `to_representation` / `source=`). `GeneratedImage`: `{id, imageUrl, prompt, productName, category, style, format, createdAt, favorite}`. Não altere formatos de request/response sem atualizar o React. Contrato completo na seção 4 de `PLANO_DJANGO.md`.
 
-### DB schema
+### Deploy / settings
 
-Two tables (migrations in `supabase/migrations/`):
-- `usage_logs(id, user_id, created_at)` — one row per generation, used for rate limiting server-side.
-- `generations(id, user_id, prompt, image_url, metadata jsonb, created_at)` — image history with RLS. `metadata` holds `productName`, `category`, `style`, `format`, `favorite`.
+`backend/config/settings/{base,dev,prod,test}.py`. Prod: `DEBUG=False`, gunicorn + whitenoise (static), HSTS/cookies seguros, Sentry opcional (`SENTRY_DSN`), nginx reverse-proxy (`nginx.prod.conf`) servindo o SPA e fazendo proxy de `/api`,`/admin`,`/static` + `/media` do volume. Segredos só em `.env` (gitignored); ver `backend/.env.example`.
 
-Storage: private bucket `generated-images`, files at `{user_id}/{uuid}.webp`.
+### Pendências conhecidas
 
-### Known architectural issues
-
-- Rate limit check and `usage_logs` insert are not atomic — concurrent requests can bypass the limit.
-- Unauthenticated requests to the edge function have no rate limiting.
-- The `generations` insert happens client-side and is swallowed on error — a network failure after generation loses the history entry.
-- Signed URLs expire in 1 year with no refresh mechanism.
-- Storage path is not stored in `generations`, making orphaned file cleanup impossible.
+- **Logo da marca não é injetado** na imagem (adiado): Stability i2i aceita 1 imagem só; exigiria compositing Pillow pós-geração. `views.py` ainda valida `logoImage` sem usar (validação morta).
+- Quota é consumida **antes** da chamada Stability → falha 5xx da IA gasta 1 slot (sem refund).
+- `@supabase/supabase-js` ficou órfão no `package.json`.
 
 # Diretrizes de Comportamento e Desenvolvimento (Claude Code)
 

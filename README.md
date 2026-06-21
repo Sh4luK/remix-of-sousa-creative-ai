@@ -13,6 +13,3 @@ Acesse em: **[http://localhost:3001](http://localhost:3001)**
 ```bash
 docker compose up web-prod --build
 ```
-
-docker compose up web-dev --build
-docker compose up web-prod --build

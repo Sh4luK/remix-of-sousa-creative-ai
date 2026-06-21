@@ -6,8 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Save, Store, Palette, MessageSquare, Plus, X, Upload } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 interface BrandConfig {
   name: string;
@@ -16,7 +15,17 @@ interface BrandConfig {
   defaultPhrase: string;     // texto que sempre aparece
   buttonText: string;        // antes "CTA"
   signature: string;         // assinatura no rodapé das artes
-  logoUrl?: string;          // URL customizada para o logotipo
+  logoUrl?: string;          // URL do logotipo (MEDIA)
+}
+
+interface BrandApi {
+  name?: string;
+  slogan?: string;
+  colors?: string[];
+  defaultPhrase?: string;
+  buttonText?: string;
+  signature?: string;
+  logoUrl?: string | null;
 }
 
 const STORAGE_KEY = "pj-midia-brand";
@@ -50,40 +59,33 @@ function loadLocalBrand(): BrandConfig {
   }
 }
 
+function mirrorLocal(brand: BrandConfig) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(brand));
+}
+
 export default function BrandSettings() {
-  const { user } = useAuth();
   const [brand, setBrand] = useState<BrandConfig>(loadLocalBrand());
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Sync Supabase brand configuration if logged in
+  // Carrega a marca persistida no Django
   useEffect(() => {
-    if (!user) return;
-
-    supabase
-      .from("brands")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!error && data) {
-          const parsedColors = Array.isArray(data.colors) ? (data.colors as string[]) : DEFAULT_BRAND.colors;
-          const loaded: BrandConfig = {
-            name: data.name,
-            slogan: data.slogan || "",
-            colors: parsedColors,
-            defaultPhrase: data.default_phrase || "",
-            buttonText: data.button_text || "",
-            signature: data.signature || "",
-            logoUrl: data.logo_path 
-              ? supabase.storage.from("brand-logos").getPublicUrl(data.logo_path).data.publicUrl 
-              : DEFAULT_BRAND.logoUrl,
-          };
-          setBrand(loaded);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
-        }
-      });
-  }, [user]);
+    api.get<BrandApi>("/brand/")
+      .then((data) => {
+        const loaded: BrandConfig = {
+          name: data.name || DEFAULT_BRAND.name,
+          slogan: data.slogan || "",
+          colors: Array.isArray(data.colors) && data.colors.length ? data.colors : DEFAULT_BRAND.colors,
+          defaultPhrase: data.defaultPhrase || "",
+          buttonText: data.buttonText || "",
+          signature: data.signature || "",
+          logoUrl: data.logoUrl || DEFAULT_BRAND.logoUrl,
+        };
+        setBrand(loaded);
+        mirrorLocal(loaded);
+      })
+      .catch(() => { /* mantém fallback local */ });
+  }, []);
 
   const update = <K extends keyof BrandConfig>(key: K, value: BrandConfig[K]) =>
     setBrand((prev) => ({ ...prev, [key]: value }));
@@ -105,61 +107,33 @@ export default function BrandSettings() {
 
   const handleSave = async () => {
     setSaving(true);
-    let logoPath: string | null = null;
+    try {
+      await api.patch<BrandApi>("/brand/", {
+        name: brand.name,
+        slogan: brand.slogan,
+        colors: brand.colors,
+        defaultPhrase: brand.defaultPhrase,
+        buttonText: brand.buttonText,
+        signature: brand.signature,
+      });
 
-    if (user) {
-      try {
-        if (logoFile) {
-          // Upload brand logo file to storage bucket
-          const fileExt = logoFile.name.split('.').pop() || 'webp';
-          logoPath = `${user.id}/logo-${Date.now()}.${fileExt}`;
-          
-          const { error: uploadErr } = await supabase.storage
-            .from("brand-logos")
-            .upload(logoPath, logoFile, { upsert: true });
-
-          if (uploadErr) throw uploadErr;
-        } else if (brand.logoUrl && brand.logoUrl.includes("/brand-logos/")) {
-          // Extract existing storage path from URL if present
-          const existingPath = brand.logoUrl.split("/brand-logos/").pop()?.split("?")[0];
-          if (existingPath) logoPath = decodeURIComponent(existingPath);
-        }
-
-        const { error: dbErr } = await supabase
-          .from("brands")
-          .upsert({
-            user_id: user.id,
-            name: brand.name,
-            slogan: brand.slogan,
-            colors: brand.colors,
-            default_phrase: brand.defaultPhrase,
-            button_text: brand.buttonText,
-            signature: brand.signature,
-            logo_path: logoPath,
-            updated_at: new Date().toISOString(),
-          });
-
-        if (dbErr) throw dbErr;
-
-        const finalLogoUrl = logoPath
-          ? supabase.storage.from("brand-logos").getPublicUrl(logoPath).data.publicUrl
-          : brand.logoUrl;
-
-        const savedBrand = { ...brand, logoUrl: finalLogoUrl };
-        setBrand(savedBrand);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedBrand));
-        
-        toast.success("Configurações salvas e sincronizadas com sucesso!");
-      } catch (err: unknown) {
-        console.error(err);
-        toast.error(err instanceof Error ? err.message : "Falha ao salvar configurações no servidor.");
-      } finally {
-        setSaving(false);
+      let logoUrl = brand.logoUrl;
+      if (logoFile) {
+        const form = new FormData();
+        form.append("logo", logoFile);
+        const res = await api.patchForm<BrandApi>("/brand/", form);
+        if (res.logoUrl) logoUrl = res.logoUrl;
+        setLogoFile(null);
       }
-    } else {
-      // Local fallback for guest users
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(brand));
-      toast.success("Configurações salvas localmente!");
+
+      const saved = { ...brand, logoUrl };
+      setBrand(saved);
+      mirrorLocal(saved);
+      toast.success("Configurações salvas e sincronizadas com sucesso!");
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Falha ao salvar configurações no servidor.");
+    } finally {
       setSaving(false);
     }
   };

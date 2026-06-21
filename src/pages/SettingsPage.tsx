@@ -1,6 +1,6 @@
 import { Settings, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { logout } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function SettingsPage() {
@@ -31,7 +31,7 @@ export default function SettingsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => supabase.auth.signOut()}
+              onClick={() => logout()}
               className="shrink-0"
             >
               <LogOut className="h-4 w-4 mr-1.5" />

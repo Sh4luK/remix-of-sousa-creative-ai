@@ -7,6 +7,11 @@ const MAX_REQUEST_BYTES = 6 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 365 * 24 * 3600;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+// Stability AI only accepts a fixed set of aspect ratios (no arbitrary pixel sizes).
+const STABILITY_ASPECT_RATIOS = ["21:9", "16:9", "3:2", "5:4", "1:1", "4:5", "2:3", "9:16", "9:21"];
+const NEGATIVE_PROMPT = "blurry, low quality, distorted text, misspelled text, watermark, deformed, jpeg artifacts, extra limbs";
+const IMG2IMG_STRENGTH = "0.55";
+
 const ALLOWED_ORIGINS = [
   "https://app.seudominio.com.br",
   "http://localhost:5173",
@@ -59,6 +64,32 @@ function validateBase64Image(dataUrl: string): { valid: boolean; bytes?: Uint8Ar
   } catch {
     return { valid: false, error: "Falha ao decodificar base64." };
   }
+}
+
+// Map arbitrary width/height to the closest Stability-supported aspect ratio.
+function pickAspectRatio(width: number, height: number): string {
+  const target = width / height;
+  let best = "1:1";
+  let bestDiff = Infinity;
+  for (const ar of STABILITY_ASPECT_RATIOS) {
+    const [w, h] = ar.split(":").map(Number);
+    const diff = Math.abs(w / h - target);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = ar;
+    }
+  }
+  return best;
+}
+
+// Stability returns raw bytes; anonymous users get an inline data URL (no hosted URL).
+function bytesToDataUrl(bytes: Uint8Array, mime = "image/webp"): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return `data:${mime};base64,${btoa(binary)}`;
 }
 
 serve(async (req) => {
@@ -236,94 +267,121 @@ serve(async (req) => {
       }
     }
 
-    // ── Build AI request with fal.ai (Flux) ──────────────────────────────────
-    const FAL_KEY = Deno.env.get("FAL_KEY");
-    if (!FAL_KEY) throw new Error("FAL_KEY não configurada no ambiente (FAL_KEY)");
+    // ── Build AI request with Stability AI (Stable Image) ─────────────────────
+    const STABILITY_KEY = Deno.env.get("STABILITY_KEY");
+    if (!STABILITY_KEY) throw new Error("STABILITY_KEY não configurada no ambiente.");
 
-    const FAL_MODEL = Deno.env.get("FAL_MODEL") || "fal-ai/flux/schnell";
     const imageToUse = productImage || backgroundImage;
     const isImageToImage = !!imageToUse;
 
-    const endpoint = isImageToImage
-      ? `https://queue.fal.run/${FAL_MODEL}/image-to-image?sync_mode=true`
-      : `https://queue.fal.run/${FAL_MODEL}?sync_mode=true`;
+    // "core" (cheapest) for text-to-image; image-to-image requires the SD3 endpoint.
+    const sd3Model = Deno.env.get("STABILITY_SD3_MODEL") || "sd3.5-large";
+    const txt2imgModel = Deno.env.get("STABILITY_MODEL") || "core";
+    const model = isImageToImage ? "sd3" : txt2imgModel;
+    const endpoint = `https://api.stability.ai/v2beta/stable-image/generate/${model}`;
 
-    const requestBody: Record<string, unknown> = {
-      prompt: prompt,
-      image_size: {
-        width: width || 1024,
-        height: height || 1024,
-      },
-      num_inference_steps: FAL_MODEL.includes("schnell") ? 4 : 28,
-      enable_safety_checker: true,
-      sync_mode: true,
-    };
+    const form = new FormData();
+    form.append("prompt", prompt);
+    form.append("negative_prompt", NEGATIVE_PROMPT);
+    form.append("output_format", "webp");
 
     if (isImageToImage) {
-      requestBody.image_url = imageToUse;
-      requestBody.strength = 0.55;
+      const baseImage = validateBase64Image(imageToUse);
+      if (!baseImage.valid || !baseImage.bytes) {
+        return new Response(JSON.stringify({ error: "Imagem base inválida para image-to-image." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      form.append("mode", "image-to-image");
+      form.append("model", sd3Model);
+      form.append("strength", IMG2IMG_STRENGTH);
+      form.append("image", new Blob([baseImage.bytes], { type: "image/webp" }), "input.webp");
+    } else {
+      // aspect_ratio and image are mutually exclusive on Stability.
+      form.append("aspect_ratio", pickAspectRatio(width || 1024, height || 1024));
+      if (model === "sd3") {
+        form.append("mode", "text-to-image");
+        form.append("model", sd3Model);
+      }
     }
 
     const aiResponse = await fetch(endpoint, {
       method: "POST",
       headers: {
-        Authorization: `Key ${FAL_KEY}`,
-        "Content-Type": "application/json",
+        Authorization: `Bearer ${STABILITY_KEY}`,
+        Accept: "image/*",
       },
-      body: JSON.stringify(requestBody),
+      body: form,
     });
 
     if (!aiResponse.ok) {
+      const errText = await aiResponse.text();
+      console.error("Stability AI error:", aiResponse.status, errText);
+
       if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições da IA fal.ai excedido. Tente em alguns segundos." }), {
+        return new Response(JSON.stringify({ error: "Limite de requisições da IA excedido. Tente em alguns segundos." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      const errText = await aiResponse.text();
-      console.error("fal.ai API error:", aiResponse.status, errText);
-      return new Response(JSON.stringify({ error: "Erro ao gerar imagem com fal.ai. Tente novamente." }), {
+      if (aiResponse.status === 402) {
+        return new Response(JSON.stringify({ error: "Créditos da Stability AI esgotados." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      if (aiResponse.status === 403) {
+        return new Response(JSON.stringify({ error: "Conteúdo bloqueado pela moderação da IA. Ajuste o prompt." }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      return new Response(JSON.stringify({ error: "Erro ao gerar imagem com Stability AI. Tente novamente." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    const aiData = await aiResponse.json();
-    const imageUrl = aiData.images?.[0]?.url;
+    // With Accept: image/*, moderation hits arrive as a header on a 200 response.
+    const finishReason = aiResponse.headers.get("finish-reason") || aiResponse.headers.get("finish_reason");
+    if (finishReason === "CONTENT_FILTERED") {
+      return new Response(JSON.stringify({ error: "Conteúdo bloqueado pelo filtro de segurança da IA. Ajuste o prompt." }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
 
-    if (!imageUrl) {
-      console.error("No image URL in fal.ai response:", JSON.stringify(aiData));
-      return new Response(JSON.stringify({ error: "A fal.ai não retornou uma URL de imagem." }), {
+    const imageBytes = new Uint8Array(await aiResponse.arrayBuffer());
+    if (imageBytes.length === 0) {
+      console.error("Empty image buffer from Stability AI");
+      return new Response(JSON.stringify({ error: "A Stability AI não retornou uma imagem." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
     // ── Upload to storage and record in Database (authenticated users only) ────
-    let finalImageUrl = imageUrl;
+    // Stability returns no hosted URL: default to inline data URL (anon fallback).
+    let finalImageUrl = bytesToDataUrl(imageBytes);
     let dbGenerationRecord = null;
 
     if (userId) {
       let storagePath = "";
       try {
-        const imageFetch = await fetch(imageUrl);
-        if (imageFetch.ok) {
-          const arrayBuffer = await imageFetch.arrayBuffer();
-          const bytes = new Uint8Array(arrayBuffer);
-          storagePath = `${userId}/${crypto.randomUUID()}.webp`;
+        storagePath = `${userId}/${crypto.randomUUID()}.webp`;
 
-          const { error: uploadError } = await admin.storage
+        const { error: uploadError } = await admin.storage
+          .from("generated-images")
+          .upload(storagePath, imageBytes, { contentType: "image/webp", upsert: false });
+
+        if (uploadError) {
+          console.error("Storage upload failed:", uploadError.message);
+        } else {
+          const { data: signed } = await admin.storage
             .from("generated-images")
-            .upload(storagePath, bytes, { contentType: "image/webp", upsert: false });
-
-          if (uploadError) {
-            console.error("Storage upload failed:", uploadError.message);
-          } else {
-            const { data: signed } = await admin.storage
-              .from("generated-images")
-              .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
-            if (signed?.signedUrl) finalImageUrl = signed.signedUrl;
-          }
+            .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+          if (signed?.signedUrl) finalImageUrl = signed.signedUrl;
         }
       } catch (storageErr) {
         console.error("Storage upload error:", storageErr);

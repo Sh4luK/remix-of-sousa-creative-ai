@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { login, register } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import logoImg from "@/assets/logo-comercial-sousa.png";
 import { Turnstile } from "@marsidev/react-turnstile";
@@ -29,26 +29,22 @@ export default function Login() {
     }
 
     setBusy(true);
-    const { error } =
-      mode === "signin"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              captchaToken: turnstileToken || undefined,
-            },
-          });
-    if (error) toast.error(error.message);
-    else if (mode === "signup")
-      toast.success("Conta criada! Verifique seu e-mail antes de entrar.");
-    setBusy(false);
+    try {
+      if (mode === "signin") {
+        await login(email, password);
+      } else {
+        const user = await register(email, password, turnstileToken || "");
+        if (!user) toast.success("Conta criada! Verifique seu e-mail antes de entrar.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha na autenticação.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleGoogle = () => {
-    supabase.auth.signInWithOAuth({
-      provider: "google",
-    });
+    toast.info("Login com Google em breve.");
   };
 
   return (
