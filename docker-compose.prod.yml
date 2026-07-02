@@ -16,10 +16,15 @@ services:
       # Em deploy real com TLS na frente, ALLOWED_HOSTS/CORS/CSRF devem apontar
       # pro domínio público e SECURE_SSL_REDIRECT=True.
       - SECURE_SSL_REDIRECT=False
+      - REDIS_URL=redis://redis:6379/0
+      # 1 proxy à frente (nginx). Se houver CDN/LB adicional na frente, aumente.
+      - NUM_PROXIES=1
     volumes:
       - media:/app/media
     expose:
       - "8000"
+    depends_on:
+      - redis
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -46,6 +51,13 @@ services:
       - media:/var/www/media:ro
     depends_on:
       - api
+    restart: unless-stopped
+
+  # Redis: cache compartilhado para rate limit global entre os workers gunicorn
+  redis:
+    image: redis:7-alpine
+    container_name: pj-midia-redis-prod
+    command: redis-server --save "" --appendonly no
     restart: unless-stopped
 
 volumes:
