@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { LogIn, Mail, Lock } from "lucide-react";
+import { LogIn, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
@@ -57,7 +58,11 @@ export default function Login() {
             className="h-16 w-16 mx-auto rounded-2xl object-contain mb-4"
           />
           <h1 className="text-3xl font-bold text-slate-900">PJ Mídia</h1>
-          <p className="text-base text-slate-600 mt-2">Entre para criar suas artes</p>
+          <p className="text-base text-slate-600 mt-2">
+            {mode === "signin"
+              ? "Bem-vindo de volta! Entre para criar suas artes."
+              : "Crie sua conta grátis e comece em 1 minuto."}
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
@@ -82,16 +87,27 @@ export default function Login() {
               <div className="relative mt-1.5">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  minLength={6}
+                  minLength={mode === "signup" ? 8 : 6}
                   autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                  className="pl-10 h-12 text-base"
+                  className="pl-10 pr-12 h-12 text-base"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-700"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
+              {mode === "signup" && (
+                <p className="text-xs text-slate-500 mt-1.5">Use no mínimo 8 caracteres, misturando letras e números.</p>
+              )}
             </div>
             {mode === "signup" && (
               <div className="flex justify-center py-2">

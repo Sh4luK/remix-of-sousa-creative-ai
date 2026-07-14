@@ -13,20 +13,30 @@ import {
 } from "lucide-react";
 import logoImg from "@/assets/logo-comercial-sousa.png";
 import { logout } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const NAV_ITEMS = [
   { to: "/", label: "Início", icon: LayoutDashboard },
-  { to: "/nova-arte", label: "Nova Arte", icon: PlusCircle },
-  { to: "/presets", label: "Estilos de Arte", icon: Layers },
+  { to: "/nova-arte", label: "Criar Encarte", icon: PlusCircle },
+  { to: "/presets", label: "Modelos Prontos", icon: Layers },
   { to: "/biblioteca", label: "Minhas Artes", icon: Image },
-  { to: "/catalogo", label: "Meu Catálogo", icon: Package },
-  { to: "/marca", label: "Config. Marca", icon: Palette },
+  { to: "/catalogo", label: "Meus Produtos", icon: Package },
+  { to: "/marca", label: "Minha Marca", icon: Palette },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogout = () => {
+    toast("Sair da sua conta?", {
+      action: { label: "Sim, sair", onClick: () => logout() },
+      cancel: { label: "Cancelar", onClick: () => {} },
+    });
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -51,7 +61,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               PJ Mídia
             </h1>
             <span className="text-[11px] font-medium text-sidebar-foreground/60">
-              AI Image Studio
+              Criador de Encartes
             </span>
           </div>
         </div>
@@ -79,16 +89,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="border-t border-sidebar-border p-4 space-y-2">
-          <div className="rounded-lg bg-sidebar-accent p-2.5 flex items-center gap-2">
-            <span className="text-xs">✨</span>
-            <p className="text-xs font-medium text-sidebar-accent-foreground/80">IA Ativada</p>
-          </div>
+          {user && (
+            <div className="rounded-lg bg-sidebar-accent p-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-sidebar-accent-foreground/50 font-semibold">Sua conta</p>
+              <p className="text-xs font-medium text-sidebar-accent-foreground/90 truncate">{user.email}</p>
+            </div>
+          )}
           <button
-            onClick={() => logout()}
+            onClick={handleLogout}
             className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
           >
             <LogOut className="h-3.5 w-3.5 shrink-0" />
-            Sair
+            Sair da conta
           </button>
         </div>
       </aside>

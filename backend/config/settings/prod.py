@@ -8,6 +8,8 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])  # noqa: F40
 # --- HTTPS / proxy ---
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)  # noqa: F405
+# Healthcheck do PaaS bate via HTTP interno (sem X-Forwarded-Proto) — não pode levar 301.
+SECURE_REDIRECT_EXEMPT = [r"^api/healthz$"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True

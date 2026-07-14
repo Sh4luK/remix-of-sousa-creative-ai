@@ -14,3 +14,6 @@ DATABASES = {
 }
 
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+
+# Desliga throttling nos testes (chamadas repetidas de auth estourariam o limite).
+REST_FRAMEWORK = {**REST_FRAMEWORK, "DEFAULT_THROTTLE_RATES": {"login": None, "register": None}}  # noqa: F405

@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework.test import APITestCase
+from rest_framework.throttling import ScopedRateThrottle
 
 User = get_user_model()
 
@@ -79,6 +81,24 @@ class LoginTests(APITestCase):
         resp2 = self.client.post(REFRESH, {"refresh": refresh})
         self.assertEqual(resp2.status_code, 200)
         self.assertIn("access", resp2.data)
+
+
+class ThrottleTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    # THROTTLE_RATES é resolvido no import; override_settings não o alcança.
+    # Patchamos o dict da classe diretamente (login desligado no settings de teste).
+    @patch.dict(ScopedRateThrottle.THROTTLE_RATES, {"login": "3/min"})
+    def test_login_throttled_after_limit(self):
+        payload = {"email": "nobody@example.com", "password": "wrong"}
+        for _ in range(3):
+            self.client.post(LOGIN, payload)
+        resp = self.client.post(LOGIN, payload)
+        self.assertEqual(resp.status_code, 429)
 
 
 class UserEndpointTests(APITestCase):

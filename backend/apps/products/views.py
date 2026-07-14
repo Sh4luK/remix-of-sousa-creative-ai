@@ -1,3 +1,7 @@
+import io
+from uuid import uuid4
+
+from django.core.files.base import ContentFile
 from PIL import Image, UnidentifiedImageError
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -7,6 +11,9 @@ from rest_framework.views import APIView
 from .models import Product
 from .serializers import ProductSerializer
 from .services import search_off
+
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_DIMENSION = 2048                 # px; redimensiona o lado maior
 
 
 class ProductListCreateView(generics.ListCreateAPIView):
@@ -44,18 +51,28 @@ class ProductUploadImageView(APIView):
         file = request.FILES.get("file")
         if not file:
             return Response({"error": "Arquivo obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
+        if file.size > MAX_UPLOAD_BYTES:
+            return Response({"error": "Imagem muito grande. Use um arquivo de até 10 MB."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Re-encoda via Pillow: descarta nome/extensão originais e qualquer payload
+        # embutido (polyglot). O arquivo salvo é sempre um webp limpo com nome uuid.
         try:
-            Image.open(file).verify()
-            file.seek(0)
-        except (UnidentifiedImageError, OSError):
+            img = Image.open(file)
+            img.load()
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGB")
+            img.thumbnail((MAX_DIMENSION, MAX_DIMENSION))
+            buffer = io.BytesIO()
+            img.save(buffer, format="WEBP", quality=82)
+        except (UnidentifiedImageError, OSError, ValueError):
             return Response({"error": "Arquivo não é uma imagem válida."}, status=status.HTTP_400_BAD_REQUEST)
 
         name = (request.data.get("name") or "").strip() or "Produto"
         category = request.data.get("category") or "outros"
         product = Product.objects.create(
-            user=request.user, name=name, category=category, image=file, source="user",
+            user=request.user, name=name, category=category, source="user",
         )
+        product.image.save(f"{uuid4().hex}.webp", ContentFile(buffer.getvalue()), save=True)
         data = ProductSerializer(product, context={"request": request}).data
         return Response({"id": product.id, "displayUrl": data["displayUrl"]}, status=status.HTTP_201_CREATED)
 

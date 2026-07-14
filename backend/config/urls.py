@@ -4,8 +4,15 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from apps.accounts.views import ThrottledLoginView, ThrottledRegisterView
+from config.views import healthz
+
 urlpatterns = [
+    path("api/healthz", healthz, name="healthz"),
     path("admin/", admin.site.urls),
+    # Views com throttle vêm ANTES dos includes para ter precedência de rota.
+    path("api/auth/login/", ThrottledLoginView.as_view(), name="rest_login"),
+    path("api/auth/registration/", ThrottledRegisterView.as_view(), name="rest_register"),
     path("api/auth/", include("dj_rest_auth.urls")),
     path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),

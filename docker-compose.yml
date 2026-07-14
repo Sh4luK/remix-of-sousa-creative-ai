@@ -13,9 +13,19 @@ services:
       - ./backend/.env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.dev
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
     dns:
       - 8.8.8.8
       - 8.8.4.4
+    restart: unless-stopped
+
+  # Redis: backend de cache para o rate limit global (ScopedRateThrottle)
+  redis:
+    image: redis:7-alpine
+    container_name: pj-midia-redis
+    command: redis-server --save "" --appendonly no
     restart: unless-stopped
 
   # Vite React frontend (dev com hot-reload)

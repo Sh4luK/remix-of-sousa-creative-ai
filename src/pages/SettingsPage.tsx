@@ -13,7 +13,7 @@ export default function SettingsPage() {
           <Settings className="h-6 w-6 text-primary" />
           Configurações
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Configurações gerais do sistema</p>
+        <p className="text-sm text-muted-foreground mt-1">Sua conta e informações do aplicativo</p>
       </div>
 
       <div className="space-y-4 animate-fade-up" style={{ animationDelay: "80ms" }}>
@@ -42,7 +42,10 @@ export default function SettingsPage() {
 
         <div className="rounded-xl border border-border bg-card p-5">
           <h3 className="font-semibold mb-1">Como funciona</h3>
-          <p className="text-sm text-muted-foreground">A inteligência artificial cria suas artes automaticamente a partir do que você escolhe.</p>
+          <p className="text-sm text-muted-foreground">
+            Você escolhe o produto, o preço e o estilo — a inteligência artificial monta a arte pronta para postar.
+            Você pode criar até <strong className="text-foreground">10 artes por dia</strong>.
+          </p>
         </div>
 
 

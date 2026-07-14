@@ -83,6 +83,23 @@ DATABASES = {
     "default": env.db("DATABASE_URL")
 }
 
+# Cache: Redis quando REDIS_URL está definido (rate limit global entre workers),
+# senão LocMemCache (por processo). Ver DEFAULT_THROTTLE_RATES abaixo.
+REDIS_URL = env("REDIS_URL", default="")
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -127,6 +144,16 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    # Rate limit por IP nos endpoints sensíveis de auth (ScopedRateThrottle).
+    # Limite global e exato quando REDIS_URL está definido; com LocMemCache é por processo.
+    "DEFAULT_THROTTLE_RATES": {
+        "login": env("THROTTLE_LOGIN", default="10/min"),
+        "register": env("THROTTLE_REGISTER", default="5/min"),
+    },
+    # Nº de proxies confiáveis à frente (nginx). Com 1, o DRF pega o último IP do
+    # X-Forwarded-For — que o nginx preenche com o peer real (imune a spoof do cliente).
+    # Vazio/None em dev (sem proxy) → usa REMOTE_ADDR.
+    "NUM_PROXIES": env.int("NUM_PROXIES", default=None),
 }
 
 # --- Simple JWT ---

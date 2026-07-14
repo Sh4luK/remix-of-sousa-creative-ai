@@ -343,7 +343,8 @@ export default function NewGeneration() {
   const handleDownload = () => {
     if (!result) return;
     const a = document.createElement("a"); a.href = result;
-    a.download = `encarte-${Date.now()}.png`; a.click();
+    a.download = `encarte-${Date.now()}.webp`; a.click();
+    toast.success("Imagem salva! Procure na pasta Downloads ou na galeria.");
   };
 
   const handleShareWhatsApp = async () => {
@@ -351,7 +352,7 @@ export default function NewGeneration() {
     const text = `🛒 *${pick?.name ?? "Oferta"}* por ${currentPrice}!`;
     try {
       const blob = await (await fetch(result)).blob();
-      const file = new File([blob], "encarte.png", { type: "image/png" });
+      const file = new File([blob], "encarte.webp", { type: blob.type || "image/webp" });
       const nav = navigator as Navigator & { canShare?: (data: { files: File[] }) => boolean };
       if (nav.share && nav.canShare?.({ files: [file] })) {
         await nav.share({ files: [file], text }); return;
@@ -405,8 +406,8 @@ export default function NewGeneration() {
                 <div className="text-xs text-slate-500">Agora é só baixar ou enviar direto pro WhatsApp.</div>
               </div>
             </div>
-            <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-              <img src={result} alt="Encarte gerado" className="w-full h-auto" />
+            <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center">
+              <img src={result} alt="Encarte gerado" className="w-full h-auto max-h-[60vh] sm:max-h-[70vh] object-contain" />
             </div>
             <Button size="lg" onClick={handleShareWhatsApp}
               className="w-full mt-5 h-14 text-base font-semibold bg-emerald-500 hover:bg-emerald-600 text-white shadow-md">
@@ -431,7 +432,7 @@ export default function NewGeneration() {
 
   // ── WIZARD ───────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 sm:pb-8">
+    <div className="min-h-screen bg-slate-50 pb-32 sm:pb-8">
       <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
         <header className="mb-5 animate-fade-up">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Criar Novo Encarte</h1>
@@ -488,20 +489,30 @@ export default function NewGeneration() {
       </div>
 
       {/* Sticky mobile bar */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 flex items-center gap-2 shadow-lg z-10">
-        <Button variant="outline" onClick={goBack} disabled={step === 1} className="h-12 px-3">
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        {step < 3 ? (
-          <Button onClick={goNext} className="flex-1 h-12 bg-sky-600 hover:bg-sky-700 text-white text-base font-semibold">
-            Continuar <ChevronRight className="h-4 w-4 ml-1" />
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 px-3 pt-2 pb-3 shadow-lg z-10">
+        <div className="flex items-center justify-between mb-2 px-0.5">
+          <span className="text-xs font-medium text-slate-500">Passo {step} de 3</span>
+          <div className="flex gap-1">
+            {[1, 2, 3].map((n) => (
+              <span key={n} className={["h-1.5 rounded-full transition-all", n === step ? "w-5 bg-sky-600" : n < step ? "w-1.5 bg-emerald-500" : "w-1.5 bg-slate-200"].join(" ")} />
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={goBack} disabled={step === 1} className="h-12 px-3">
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-        ) : (
-          <Button onClick={handleGenerate}
-            className="flex-1 h-12 bg-gradient-to-r from-sky-600 to-teal-500 text-white text-base font-semibold">
-            <Sparkles className="h-5 w-5 mr-2" /> Gerar Encarte
-          </Button>
-        )}
+          {step < 3 ? (
+            <Button onClick={goNext} className="flex-1 h-12 bg-sky-600 hover:bg-sky-700 text-white text-base font-semibold">
+              Continuar <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          ) : (
+            <Button onClick={handleGenerate}
+              className="flex-1 h-12 bg-gradient-to-r from-sky-600 to-teal-500 text-white text-base font-semibold">
+              <Sparkles className="h-5 w-5 mr-2" /> Gerar Encarte
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -509,28 +520,36 @@ export default function NewGeneration() {
 
 function Stepper({ step }: { step: 1 | 2 | 3 }) {
   const steps = [{ n: 1, label: "Produto" }, { n: 2, label: "Preço" }, { n: 3, label: "Estilo" }];
+  const active = steps.find((s) => s.n === step)!;
   return (
-    <div className="flex items-center gap-2 mb-5 animate-fade-up" style={{ animationDelay: "60ms" }}>
-      {steps.map((s, i) => {
-        const isDone = step > s.n, isActive = step === s.n;
-        return (
-          <div key={s.n} className="flex items-center flex-1">
-            <div className="flex items-center gap-2">
-              <div className={["h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold transition",
-                isDone ? "bg-emerald-500 text-white" :
-                isActive ? "bg-sky-600 text-white shadow-md shadow-sky-200" : "bg-slate-200 text-slate-500"].join(" ")}>
-                {isDone ? <Check className="h-4 w-4" /> : s.n}
+    <div className="mb-5 animate-fade-up" style={{ animationDelay: "60ms" }}>
+      <div className="flex items-center gap-2">
+        {steps.map((s, i) => {
+          const isDone = step > s.n, isActive = step === s.n;
+          return (
+            <div key={s.n} className="flex items-center flex-1">
+              <div className="flex items-center gap-2">
+                <div className={["h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold transition",
+                  isDone ? "bg-emerald-500 text-white" :
+                  isActive ? "bg-sky-600 text-white shadow-md shadow-sky-200" : "bg-slate-200 text-slate-500"].join(" ")}>
+                  {isDone ? <Check className="h-4 w-4" /> : s.n}
+                </div>
+                <span className={["text-sm font-medium hidden sm:inline", isActive ? "text-slate-900" : "text-slate-500"].join(" ")}>
+                  {s.label}
+                </span>
               </div>
-              <span className={["text-sm font-medium hidden sm:inline", isActive ? "text-slate-900" : "text-slate-500"].join(" ")}>
-                {s.label}
-              </span>
+              {i < steps.length - 1 && (
+                <div className={["flex-1 h-1 mx-2 sm:mx-3 rounded-full transition-colors", step > s.n ? "bg-emerald-500" : "bg-slate-200"].join(" ")} />
+              )}
             </div>
-            {i < steps.length - 1 && (
-              <div className={["flex-1 h-1 mx-3 rounded-full", step > s.n ? "bg-emerald-500" : "bg-slate-200"].join(" ")} />
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      {/* Contexto do passo atual — só no celular, onde os rótulos ficam ocultos */}
+      <p className="sm:hidden mt-2.5 text-sm text-slate-500">
+        Passo <span className="font-semibold text-slate-900">{step}</span> de 3 ·{" "}
+        <span className="font-semibold text-sky-700">{active.label}</span>
+      </p>
     </div>
   );
 }
@@ -915,16 +934,25 @@ function Step3({ styleId, setStyleId, formatId, setFormatId }: {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {FORMATS.map((f) => {
             const selected = formatId === f.value;
+            const ar = f.width / f.height;
+            const boxW = ar >= 1 ? 32 : Math.round(32 * ar);
+            const boxH = ar >= 1 ? Math.round(32 / ar) : 32;
             return (
               <button key={f.value} onClick={() => setFormatId(f.value)}
-                className={["w-full flex items-center justify-between p-4 rounded-xl border-2 text-left transition",
+                className={["w-full flex items-center gap-3 p-4 rounded-xl border-2 text-left transition",
                   selected ? "border-sky-600 bg-sky-50/60 shadow-sm font-semibold" : "border-slate-200 hover:border-sky-300 bg-white"].join(" ")}>
-                <div>
+                <div className="h-9 w-9 flex items-center justify-center shrink-0">
+                  <div
+                    className={["rounded-[3px] border-2", selected ? "border-sky-500 bg-sky-200/70" : "border-slate-300 bg-slate-100"].join(" ")}
+                    style={{ width: boxW, height: boxH }}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-slate-900">{f.label}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">{f.width} × {f.height} px</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{f.value} · {f.width} × {f.height} px</div>
                 </div>
                 {selected && (
-                  <div className="h-6 w-6 rounded-full bg-sky-600 text-white flex items-center justify-center">
+                  <div className="h-6 w-6 rounded-full bg-sky-600 text-white flex items-center justify-center shrink-0">
                     <Check className="h-3.5 w-3.5" />
                   </div>
                 )}
