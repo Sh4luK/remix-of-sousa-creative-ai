@@ -5,8 +5,10 @@ from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.accounts.views import ThrottledLoginView, ThrottledRegisterView
+from config.views import healthz
 
 urlpatterns = [
+    path("api/healthz", healthz, name="healthz"),
     path("admin/", admin.site.urls),
     # Views com throttle vêm ANTES dos includes para ter precedência de rota.
     path("api/auth/login/", ThrottledLoginView.as_view(), name="rest_login"),
