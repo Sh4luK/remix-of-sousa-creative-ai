@@ -24,6 +24,13 @@ function getBusinessLabel(presetId: string): string {
   return BUSINESS_LABELS[presetId] || presetId;
 }
 
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export default function Dashboard() {
   const [library, setLibrary] = useState<GeneratedImage[]>([]);
 
@@ -37,11 +44,11 @@ export default function Dashboard() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
       {/* Header */}
       <div className="animate-fade-up">
-        <h1 className="text-2xl font-bold tracking-tight text-balance">
-          PJ Mídia
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">
+          {getGreeting()}! 👋
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Gere artes promocionais profissionais para a PJ Mídia
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+          Qual oferta vamos anunciar hoje?
         </p>
       </div>
 
@@ -50,8 +57,8 @@ export default function Dashboard() {
         <Link to="/nova-arte">
           <div className="group relative overflow-hidden rounded-xl promo-gradient p-5 text-primary-foreground transition-all duration-200 hover:shadow-lg active:scale-[0.98]">
             <PlusCircle className="h-8 w-8 mb-3 opacity-90" />
-            <h3 className="font-bold text-lg">Nova Arte</h3>
-            <p className="text-sm opacity-80 mt-1">Criar imagem promocional</p>
+            <h3 className="font-bold text-lg">Criar Encarte</h3>
+            <p className="text-sm opacity-80 mt-1">Pronto em 3 passos, direto pro WhatsApp</p>
             <ArrowRight className="absolute bottom-5 right-5 h-5 w-5 opacity-60 group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>
@@ -59,8 +66,8 @@ export default function Dashboard() {
         <Link to="/presets">
           <div className="group relative overflow-hidden rounded-xl bg-card border border-border p-5 transition-all duration-200 hover:shadow-md hover:border-primary/20 active:scale-[0.98]">
             <Layers className="h-8 w-8 mb-3 text-primary" />
-            <h3 className="font-bold text-lg">Estilos de Arte</h3>
-            <p className="text-sm text-muted-foreground mt-1">{PRESETS.length} estilos prontos para usar</p>
+            <h3 className="font-bold text-lg">Modelos Prontos</h3>
+            <p className="text-sm text-muted-foreground mt-1">{PRESETS.length} modelos: açougue, bebidas, atacado...</p>
             <ArrowRight className="absolute bottom-5 right-5 h-5 w-5 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>
@@ -69,7 +76,9 @@ export default function Dashboard() {
           <div className="group relative overflow-hidden rounded-xl bg-card border border-border p-5 transition-all duration-200 hover:shadow-md hover:border-primary/20 active:scale-[0.98]">
             <Image className="h-8 w-8 mb-3 text-accent" />
             <h3 className="font-bold text-lg">Minhas Artes</h3>
-            <p className="text-sm text-muted-foreground mt-1">{library.length} artes salvas</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {library.length === 0 ? "Suas criações ficam salvas aqui" : `${library.length} artes salvas`}
+            </p>
             <ArrowRight className="absolute bottom-5 right-5 h-5 w-5 text-muted-foreground/40 group-hover:translate-x-1 transition-transform" />
           </div>
         </Link>
@@ -106,7 +115,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              Gerações Recentes
+              Suas últimas artes
             </h2>
             <Link to="/biblioteca" className="text-sm text-primary font-medium hover:underline">
               Ver todas
@@ -138,14 +147,14 @@ export default function Dashboard() {
       {library.length === 0 && (
         <div className="animate-fade-up rounded-xl border-2 border-dashed border-border p-12 text-center" style={{ animationDelay: "240ms" }}>
           <Sparkles className="h-10 w-10 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="font-semibold text-lg">Nenhuma arte gerada ainda</h3>
+          <h3 className="font-semibold text-lg">Crie seu primeiro encarte agora</h3>
           <p className="text-sm text-muted-foreground mt-1 mb-4">
-            Comece criando sua primeira arte promocional
+            Escolha o produto, digite o preço e a IA faz o resto. Leva menos de 1 minuto.
           </p>
-          <Button asChild>
+          <Button asChild size="lg" className="h-12 px-6">
             <Link to="/nova-arte">
               <PlusCircle className="h-4 w-4 mr-2" />
-              Criar Primeira Arte
+              Criar minha primeira arte
             </Link>
           </Button>
         </div>

@@ -50,7 +50,7 @@ export default function Presets() {
           </span>
         </div>
         <p className="text-sm text-muted-foreground">
-          Templates otimizados para cada tipo de campanha — clique para gerar
+          Escolha um modelo pronto para o seu tipo de oferta — é só tocar e preencher o produto e o preço.
         </p>
       </div>
 

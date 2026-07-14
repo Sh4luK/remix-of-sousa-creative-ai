@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Heart, Trash2, Download, Image as ImageIcon, Search } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Heart, Trash2, Download, Image as ImageIcon, Search, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getLibrary, toggleFavorite, deleteFromLibrary, type GeneratedImage } from "@/lib/generationStore";
@@ -31,25 +32,39 @@ export default function Library() {
     refresh();
   };
 
-  const handleDelete = async (id: string) => {
-    await deleteFromLibrary(id);
-    refresh();
-    if (selected?.id === id) setSelected(null);
-    toast.success("Arte removida");
+  const handleDelete = (id: string, name: string) => {
+    toast(`Excluir a arte "${name}"?`, {
+      description: "Essa ação não pode ser desfeita.",
+      action: {
+        label: "Sim, excluir",
+        onClick: async () => {
+          await deleteFromLibrary(id);
+          refresh();
+          if (selected?.id === id) setSelected(null);
+          toast.success("Arte excluída");
+        },
+      },
+      cancel: { label: "Cancelar", onClick: () => {} },
+    });
   };
 
   const handleDownload = (img: GeneratedImage) => {
     const a = document.createElement("a");
     a.href = img.imageUrl;
-    a.download = `pjmidia-${img.productName.replace(/\s+/g, "-")}-${Date.now()}.png`;
+    a.download = `pjmidia-${img.productName.replace(/\s+/g, "-")}-${Date.now()}.webp`;
     a.click();
+    toast.success("Imagem salva! Procure na pasta Downloads ou na galeria.");
   };
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="mb-6 animate-fade-up">
-        <h1 className="text-2xl font-bold tracking-tight">Biblioteca de Artes</h1>
-        <p className="text-sm text-muted-foreground mt-1">{library.length} artes salvas</p>
+        <h1 className="text-2xl font-bold tracking-tight">Minhas Artes</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {library.length === 0
+            ? "Tudo que você criar fica guardado aqui"
+            : `Você tem ${library.length} ${library.length === 1 ? "arte salva" : "artes salvas"}`}
+        </p>
       </div>
 
       {/* Filters */}
@@ -82,10 +97,21 @@ export default function Library() {
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-border p-12 text-center animate-fade-up">
           <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground/30 mb-4" />
-          <p className="font-medium">Nenhuma arte encontrada</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {library.length === 0 ? "Gere sua primeira arte para vê-la aqui" : "Tente outro filtro"}
+          <p className="font-medium">
+            {library.length === 0 ? "Você ainda não criou nenhuma arte" : "Nenhuma arte encontrada"}
           </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {library.length === 0
+              ? "Leva menos de 1 minuto para criar a primeira."
+              : "Tente buscar por outro nome ou limpar o filtro."}
+          </p>
+          {library.length === 0 && (
+            <Button asChild className="mt-4">
+              <Link to="/nova-arte">
+                <PlusCircle className="h-4 w-4 mr-2" /> Criar minha primeira arte
+              </Link>
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 animate-fade-up" style={{ animationDelay: "80ms" }}>
@@ -104,27 +130,28 @@ export default function Library() {
                   {new Date(img.createdAt).toLocaleDateString("pt-BR")}
                 </p>
               </div>
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Ações: sempre visíveis no touch (mobile), hover no desktop */}
+              <div className="absolute top-2 right-2 flex gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <button
                   aria-label="Favoritar"
                   onClick={(e) => { e.stopPropagation(); handleToggleFav(img.id, !img.favorite); }}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-card/90 backdrop-blur transition-colors hover:bg-card"
+                  className="flex h-9 w-9 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-card/95 shadow-sm backdrop-blur transition-colors hover:bg-card"
                 >
-                  <Heart className={`h-3.5 w-3.5 ${img.favorite ? "fill-primary text-primary" : "text-foreground"}`} />
+                  <Heart className={`h-4 w-4 ${img.favorite ? "fill-primary text-primary" : "text-foreground"}`} />
                 </button>
                 <button
                   aria-label="Baixar"
                   onClick={(e) => { e.stopPropagation(); handleDownload(img); }}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-card/90 backdrop-blur transition-colors hover:bg-card"
+                  className="flex h-9 w-9 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-card/95 shadow-sm backdrop-blur transition-colors hover:bg-card"
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  <Download className="h-4 w-4" />
                 </button>
                 <button
-                  aria-label="Remover"
-                  onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-card/90 backdrop-blur transition-colors hover:bg-destructive/90 hover:text-destructive-foreground"
+                  aria-label="Excluir"
+                  onClick={(e) => { e.stopPropagation(); handleDelete(img.id, img.productName); }}
+                  className="flex h-9 w-9 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-card/95 shadow-sm backdrop-blur transition-colors hover:bg-destructive/90 hover:text-destructive-foreground"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -149,7 +176,7 @@ export default function Library() {
                 })}
               </p>
               <details className="text-xs">
-                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Ver prompt</summary>
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Detalhes técnicos</summary>
                 <p className="mt-2 font-mono bg-muted p-3 rounded-lg break-words">{selected.prompt}</p>
               </details>
               <div className="flex gap-2 pt-2">
