@@ -38,7 +38,7 @@ Stores que consomem a API: `generationStore.ts`, `productStore.ts`, `openFoodFac
 
 `App.tsx` envolve as rotas protegidas em `<ProtectedRoutes>`, que lê `useAuth` (`src/hooks/useAuth.ts`, consome `/api/auth/user/`) e redireciona para `/login` sem sessão. `AppLayout` envolve as páginas autenticadas com a sidebar.
 
-Rotas: `/` Dashboard, `/nova-arte` NewGeneration, `/biblioteca` Library, `/presets` Presets, `/marca` BrandSettings, `/configuracoes` SettingsPage. Login/registro em `Login.tsx` (envia `turnstile_token`; Google é stub).
+Rotas: `/` Dashboard, `/nova-arte` NewGeneration, `/biblioteca` Library, `/presets` Presets, `/marca` BrandSettings, `/configuracoes` SettingsPage. Login/registro em `Login.tsx` (envia `turnstile_token`). Login com Google via `@react-oauth/google` (`useGoogleLogin`, flow `auth-code`) → `POST /api/auth/google/` (`GoogleLoginView`, dj-rest-auth `SocialLoginView` + `allauth.socialaccount.providers.google`) → `api.loginWithGoogle()`. Client ID em `VITE_GOOGLE_CLIENT_ID` (front) / `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET` (back, via env — sem `SocialApp` no admin/DB). Sem client ID configurado, o botão mostra toast "não configurado" em vez de quebrar (`main.tsx` usa client ID placeholder pra não derrubar o `GoogleOAuthProvider`).
 
 ### Image generation flow
 
