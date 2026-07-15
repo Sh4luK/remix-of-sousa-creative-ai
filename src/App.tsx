@@ -50,14 +50,21 @@ const App = () => (
   <BrowserRouter>
     <Toaster />
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route 
-        path="/*" 
+      <Route
+        path="/login"
+        element={
+          <ErrorBoundary>
+            <Login />
+          </ErrorBoundary>
+        }
+      />
+      <Route
+        path="/*"
         element={
           <ErrorBoundary>
             <ProtectedRoutes />
           </ErrorBoundary>
-        } 
+        }
       />
     </Routes>
   </BrowserRouter>

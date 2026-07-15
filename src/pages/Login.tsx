@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { LogIn, Mail, Lock } from "lucide-react";
+import { useGoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { login, register } from "@/lib/api";
+import { login, register, loginWithGoogle } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import logoImg from "@/assets/logo-comercial-sousa.png";
 import { Turnstile } from "@marsidev/react-turnstile";
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export default function Login() {
   const { session, loading } = useAuth();
@@ -18,6 +21,21 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
 
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+
+  const handleGoogle = useGoogleLogin({
+    flow: "auth-code",
+    onSuccess: async ({ code }) => {
+      setBusy(true);
+      try {
+        await loginWithGoogle(code);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Falha no login com Google.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    onError: () => toast.error("Falha no login com Google."),
+  });
 
   if (!loading && session) return <Navigate to="/" replace />;
 
@@ -43,8 +61,12 @@ export default function Login() {
     }
   };
 
-  const handleGoogle = () => {
-    toast.info("Login com Google em breve.");
+  const handleGoogleClick = () => {
+    if (!GOOGLE_CLIENT_ID) {
+      toast.info("Login com Google ainda não configurado.");
+      return;
+    }
+    handleGoogle();
   };
 
   return (
@@ -121,7 +143,7 @@ export default function Login() {
           <Button
             type="button"
             variant="outline"
-            onClick={handleGoogle}
+            onClick={handleGoogleClick}
             disabled={busy}
             className="w-full h-12 font-medium text-base"
           >

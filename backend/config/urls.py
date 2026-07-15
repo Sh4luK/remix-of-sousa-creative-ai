@@ -4,10 +4,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from apps.accounts.views import GoogleLoginView
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("dj_rest_auth.urls")),
     path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
+    path("api/auth/google/", GoogleLoginView.as_view(), name="google_login"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/brand/", include("apps.branding.urls")),
     path("api/products/", include("apps.products.urls")),

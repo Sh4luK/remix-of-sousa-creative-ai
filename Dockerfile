@@ -27,8 +27,10 @@ FROM base AS builder
 # Vite lê estas vars em build time. Vazio = URL relativa (mesma origem via nginx).
 ARG VITE_API_URL=""
 ARG VITE_TURNSTILE_SITE_KEY=""
+ARG VITE_GOOGLE_CLIENT_ID=""
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_TURNSTILE_SITE_KEY=$VITE_TURNSTILE_SITE_KEY
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN npm run build
 
 

@@ -17,6 +17,7 @@
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@react-oauth/google": "^0.13.5",
     "@sentry/react": "^10.53.1",
     "@supabase/supabase-js": "^2.99.3",
     "class-variance-authority": "^0.7.1",

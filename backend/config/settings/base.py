@@ -31,6 +31,7 @@ THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
     "dj_rest_auth",
     "dj_rest_auth.registration",
     "django_cleanup.apps.CleanupConfig",
@@ -157,6 +158,21 @@ ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_EMAIL_VERIFICATION = "none"  # set to "mandatory" when SMTP is configured
+
+# --- Google OAuth (login social) ---
+# App configurado via env, sem depender de SocialApp no admin/DB.
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "APP": {
+            "client_id": env("GOOGLE_OAUTH_CLIENT_ID", default=""),
+            "secret": env("GOOGLE_OAUTH_CLIENT_SECRET", default=""),
+            "key": "",
+        },
+        "SCOPE": ["profile", "email"],
+    }
+}
+SOCIALACCOUNT_STORE_TOKENS = False
+SOCIALACCOUNT_AUTO_SIGNUP = True
 
 CORS_ALLOW_ALL_ORIGINS = False
 

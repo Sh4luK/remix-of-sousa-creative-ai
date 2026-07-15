@@ -176,6 +176,16 @@ export async function register(
   return null; // verificação por e-mail ligada → sem sessão imediata
 }
 
+export async function loginWithGoogle(code: string): Promise<AuthUser> {
+  const data = await request<{ access: string; refresh: string; user: AuthUser }>(
+    "/auth/google/",
+    { method: "POST", body: { code }, auth: false },
+  );
+  setTokens(data.access, data.refresh);
+  emitAuthChange();
+  return data.user;
+}
+
 export async function logout(): Promise<void> {
   try {
     await request("/auth/logout/", { method: "POST" });
